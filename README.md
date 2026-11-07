@@ -1,11 +1,13 @@
 # IELTS Learning Centre
 
-Browser-based IELTS preparation website with a React learner interface, Express API, PostgreSQL database, AI-assisted practice assessment, and editable subscription plans.
+This repository is being prepared for the IELTS Learning Centre website.
 
-## Deployment
+## Project scope
 
-This repository includes a Render Blueprint (`render.yaml`). The application source is packaged in `ielts-app.zip`; Render extracts it during the build. The Blueprint provisions a Node web service and managed PostgreSQL database.
+The application package is available separately and contains a React/Vite learner website, an Express API, PostgreSQL schema, AI-assisted practice assessment, subscription-plan administration, and Flutterwave checkout integration.
 
-Before launch, configure the OpenAI and Flutterwave server-side secrets in Render, apply `ielts-standard-app/server/db/schema.sql` to the database, create an administrator account, and test payments with Flutterwave test credentials.
+## Deployment status
 
-This is an IELTS preparation platform, not an official IELTS examination product. AI bands are practice estimates. See the application README for current feature limitations and setup details.
+The repository has been initialized, but the application source files and Render Blueprint have not yet been committed. Do not create a Render deployment from this repository until those files are present.
+
+The platform is an IELTS preparation product, not an official IELTS examination service. AI-generated bands are practice estimates only. Full-length calibrated question banks, authentic listening recordings, audio-based speaking assessment, payment hardening, and production security review remain outstanding.
