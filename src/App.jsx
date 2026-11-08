@@ -28,7 +28,7 @@ export default function App() {
       speaking: 'SPEAKING — 11–14 minutes, conducted as an interview. PART 1 (4–5 minutes): introduction and familiar questions: Do you work or study? What do you like about the place where you live? What do you usually do in the evenings? PART 2 (3–4 minutes): you receive one cue card, have 1 minute to prepare, then speak for up to 2 minutes: Describe a person who has helped you. Say who the person is, how they helped you, when it happened and explain how you felt. PART 3 (4–5 minutes): discuss broader questions: Why is it important for people to help each other? Should children be taught to volunteer? How can communities support people in need?'
     }
   };
-  const [prompt,setPrompt] = useState('Academic Writing Task 2: Some people believe universities should focus on practical skills rather than theoretical knowledge. To what extent do you agree or disagree?');
+  const [prompt,setPrompt] = useState(taskPrompts.academic.writing);
   const [answer,setAnswer] = useState('');
   const [feedback,setFeedback] = useState(null);
   const [busy,setBusy] = useState(false);
