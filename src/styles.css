@@ -20,3 +20,10 @@
 .mock-times b{display:block;color:#e7b58f;font:700 18px Manrope;margin-bottom:4px}
 .skills-heading{margin-top:55px}
 @media(max-width:650px){.choice-grid,.mode-grid,.mock-overview{grid-template-columns:1fr}.mock-overview>small{grid-column:auto}.choice-card,.mode-card{padding:20px}}
+
+.mock-controls{display:flex;align-items:center;gap:14px;padding:14px 16px;margin:0 0 20px;background:#f6f1eb;border:1px solid #ead9c9;border-radius:8px}
+.mock-controls .primary{padding:11px 15px}
+.mock-controls>span{font-size:11px;color:#778784}
+.timer,.timer-warning{font:800 25px Manrope;color:#1d4140;font-variant-numeric:tabular-nums}
+.timer-warning{color:#b54d37}
+.practice-form textarea:disabled{background:#f4f5f1;color:#84918d;cursor:not-allowed}
