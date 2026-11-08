@@ -25,8 +25,8 @@ const questions=[
 [16,'Note completion','The guided walk begins at ______.','text','10:30'],
 [17,'Multiple choice','What is the maximum size of a guided walk group?','choice',['10','15','20'],'B'],
 [18,'Multiple choice','When is the rose garden expected to reopen?','choice',['May','June','July'],'C'],
-[19,'True / False / Not Given','Dogs are allowed in the park if kept on a lead.','tfng','TRUE'],
-[20,'True / False / Not Given','Visitors must pay to enter the museum.','tfng','FALSE'],
+[19,'Map / plan labelling','The bicycle entrance is on which side of the park?','choice',['North','South','East','West'],'C'],
+[20,'Multiple choice','Which place is located near the lake?','choice',['The café','The museum','The playground'],'A'],
 [21,'Multiple choice','How did the students collect most of their responses?','choice',['By telephone','Online','At the station'],'B'],
 [22,'Multiple choice','What was the main reason people chose the bus?','choice',['Cost','Journey time','Comfort'],'A'],
 [23,'Matching','Younger respondents were more concerned about…','choice',['reliability','convenience','ticket design'],'B'],
@@ -64,7 +64,7 @@ export default function ListeningExam({testType='academic',testMode='practice'})
   window.speechSynthesis.speak(utterance);
  };
  const stop=()=>{if(window.speechSynthesis)window.speechSynthesis.cancel();setPlaying(false);};
- const submit=()=>{stop();const score=questions.reduce((n,q)=>n+(norm(answers[q[0]])===norm(q[4])?1:0),0);setResult({score,answered:Object.values(answers).filter(v=>String(v||'').trim()).length});};
+ const submit=()=>{stop();const score=questions.reduce((n,q)=>n+(norm(answers[q[0]])===norm(q[3]==='choice'?q[5]:q[4])?1:0),0);setResult({score,answered:Object.values(answers).filter(v=>String(v||'').trim()).length});};
  return <div className="listening-exam">
   <div className="listening-top"><div><span className="tag">IELTS LISTENING · {testType==='academic'?'ACADEMIC':'GENERAL TRAINING'}</span><h3>Listening test · 40 questions</h3><p>4 parts · approximately 30 minutes · Questions follow the recording order.</p></div><div className="listening-progress">{Object.values(answers).filter(v=>String(v||'').trim()).length}<small> / 40 answered</small></div></div>
   <div className="listening-notice"><b>Audio format note:</b> This first version uses your browser’s speech voice to read the listening scripts aloud. It is useful for practice, but it is not a professionally recorded IELTS audio track and voice/accent may vary by device.</div>
