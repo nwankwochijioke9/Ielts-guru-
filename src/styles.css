@@ -27,3 +27,12 @@
 .timer,.timer-warning{font:800 25px Manrope;color:#1d4140;font-variant-numeric:tabular-nums}
 .timer-warning{color:#b54d37}
 .practice-form textarea:disabled{background:#f4f5f1;color:#84918d;cursor:not-allowed}
+
+.exam-order{display:grid;grid-template-columns:1fr 1.35fr;gap:28px;align-items:center;padding:26px 28px;margin:24px 0 42px;background:#f7f5ef;border:1px solid #e8e4d9;border-radius:11px}
+.exam-order h3{font:700 21px Manrope;color:#1d4140;margin:10px 0}
+.exam-order p{font-size:12px;line-height:1.75;color:#788784;max-width:390px}
+.exam-order ol{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.exam-order li{display:flex;align-items:center;gap:12px;padding:13px;background:#fff;border:1px solid #e9e8e1;border-radius:8px;color:#1d4140;font-size:12px;font-weight:700}
+.exam-order li>b{font:700 17px Manrope;color:#bd784b}
+.exam-order li small{display:block;margin-top:4px;font-size:10px;font-weight:400;color:#788784}
+@media(max-width:760px){.exam-order{grid-template-columns:1fr;padding:21px}.exam-order ol{grid-template-columns:1fr}}
