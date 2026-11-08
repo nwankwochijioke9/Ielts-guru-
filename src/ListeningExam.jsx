@@ -7,7 +7,7 @@ const parts=[
 {title:'PART 4 — Lecture on coastal wetlands',context:'A university lecture about the role of coastal wetlands.',script:'Today I will discuss coastal wetlands and their importance. Wetlands form where land is regularly covered by shallow water. They provide habitats for birds, fish and many other species. One important function is flood protection. Wetland plants slow the movement of water and their roots help hold soil in place. Wetlands can also store carbon in their soils, sometimes for very long periods. However, these environments face pressure from urban development, pollution and changes in water flow. Restoration projects often begin by removing barriers that prevent natural tides from reaching the wetland. Scientists then monitor water quality and plant growth. A common mistake is to measure success only by the area of land restored. It is equally important to examine biodiversity and whether native species return. Local communities can contribute by reporting changes in wildlife and helping to remove litter. Long-term monitoring is essential because ecological recovery may take many years.'}
 ];
 const questions=[
-[1,'Form completion','Course name','text','cooking'],
+[1,'Form completion','Course name','text','cooking course'],
 [2,'Form completion','First class day','text','Thursday'],
 [3,'Form completion','Course duration (number of weeks)','text','6'],
 [4,'Form completion','Course fee (in pounds)','text','84'],
@@ -50,10 +50,11 @@ const questions=[
 ];
 const norm=s=>String(s||'').trim().toLowerCase().replace(/[.,]/g,'').replace(/\s+/g,' ');
 export default function ListeningExam({testType='academic',testMode='practice'}){
- const [answers,setAnswers]=useState({}),[activePart,setActivePart]=useState(0),[playing,setPlaying]=useState(false),[played,setPlayed]=useState({}),[result,setResult]=useState(null);
+ const [answers,setAnswers]=useState({}),[activePart,setActivePart]=useState(0),[playing,setPlaying]=useState(false),[played,setPlayed]=useState({}),[result,setResult]=useState(null),[remaining,setRemaining]=useState(1800),[timerStarted,setTimerStarted]=useState(false);
  const mock=testMode==='mock';
  useEffect(()=>()=>{if(typeof window!=='undefined'&&window.speechSynthesis)window.speechSynthesis.cancel();},[]);
- const play=()=>{
+ useEffect(()=>{if(!mock||!timerStarted)return;const timer=setInterval(()=>setRemaining(v=>{if(v<=1){clearInterval(timer);setTimerStarted(false);if(window.speechSynthesis)window.speechSynthesis.cancel();setPlaying(false);return 0;}return v-1;}),1000);return()=>clearInterval(timer);},[mock,timerStarted]);
+ const play=()=>{if(mock&&!timerStarted)setTimerStarted(true);
   if(typeof window==='undefined'||!window.speechSynthesis){alert('Audio playback is not supported in this browser. Please use an up-to-date browser.');return;}
   window.speechSynthesis.cancel();
   const utterance=new SpeechSynthesisUtterance(parts[activePart].script);
@@ -72,7 +73,7 @@ export default function ListeningExam({testType='academic',testMode='practice'})
   <div className="listening-player"><div><small>NOW PLAYING · PART {activePart+1}</small><h4>{parts[activePart].title}</h4><p>{parts[activePart].context}</p></div><div className="listening-controls"><button type="button" className="primary" onClick={play} disabled={playing||(mock&&played[activePart])}>{playing?'Playing…':played[activePart]?(mock?'Recording played':'Play again'):'▶ Play recording'}</button><button type="button" className="secondary" onClick={stop} disabled={!playing}>Stop</button></div>{mock&&played[activePart]&&<small className="played-note">Mock mode: this part has been played once.</small>}</div>
   <div className="listening-questions"><h4>Part {activePart+1} questions</h4><p className="reading-instructions">Listen to the recording and answer the questions in this part. You can move between parts.</p>{questions.filter(q=>Math.ceil(q[0]/10)===activePart+1).map(q=><div className="listening-question" key={q[0]}><div><b>{q[0]}.</b> <span className="question-type">{q[1]}</span></div><p>{q[2]}</p>{q[3]==='choice'?<div className="reading-options">{q[3+1].map((v,i)=>{const k=String.fromCharCode(65+i);return <label key={k}><input type="radio" name={'listen'+q[0]} checked={answers[q[0]]===k} onChange={()=>setAnswers(a=>({...a,[q[0]]:k}))}/><span>{k}. {v}</span></label>;})}</div>:<input className="reading-short-answer" value={answers[q[0]]||''} onChange={e=>setAnswers(a=>({...a,[q[0]]:e.target.value}))} placeholder="Your answer"/>}</div>)}</div>
   <div className="listening-bottom"><button type="button" className="secondary" onClick={()=>{stop();setActivePart(Math.max(0,activePart-1));}} disabled={activePart===0}>← Previous part</button><button type="button" className="secondary" onClick={()=>{stop();setActivePart(Math.min(3,activePart+1));}} disabled={activePart===3}>Next part →</button><button type="button" className="primary" onClick={submit}>Submit Listening test →</button></div>
-  {result&&<div className="reading-result"><h3>Your Listening practice result</h3><strong>{result.score} / 40</strong><p>{result.answered} questions answered. This is a raw practice score, not an official IELTS band. Check spelling and singular/plural forms carefully.</p><button type="button" className="primary" onClick={()=>{setAnswers({});setPlayed({});setActivePart(0);setResult(null);}}>Retake test</button></div>}
+  {result&&<div className="reading-result"><h3>Your Listening practice result</h3><strong>{result.score} / 40</strong><p>{result.answered} questions answered. This is a raw practice score, not an official IELTS band. Check spelling and singular/plural forms carefully.</p><button type="button" className="primary" onClick={()=>{setAnswers({});setPlayed({});setActivePart(0);setResult(null);setRemaining(1800);setTimerStarted(false);}}>Retake test</button></div>}
   <p className="reading-disclaimer">Original practice material using IELTS-style section order and question types. It is not an official IELTS paper. This prototype uses synthetic browser speech, does not yet reproduce the official audio quality, answer transfer time or all official question layouts. The same practice set is currently used for Academic and General Training.</p>
  </div>;
 }
