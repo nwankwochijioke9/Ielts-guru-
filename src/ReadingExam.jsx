@@ -102,7 +102,7 @@ export default function ReadingExam({testType='academic',onClose}){
  useEffect(()=>{if(!started)return;const t=setInterval(()=>setRemaining(v=>{if(v<=1){clearInterval(t);setStarted(false);return 0;}return v-1;}),1000);return()=>clearInterval(t);},[started]);
  const questionSet=testType==='academic'?questions:generalQuestions;
  const set=(n,v)=>setAnswers(a=>({...a,[n]:v}));
- const submit=()=>{const score=questionSet.reduce((s,q)=>s+(String(answers[q[0]]||'').trim().toLowerCase()===q[6].toLowerCase()?1:0),0);setResult({score,count:Object.values(answers).filter(x=>String(x).trim()).length});setStarted(false);};
+ const submit=()=>{const score=questionSet.reduce((s,q)=>s+(String(answers[q[0]]||'').trim().toLowerCase()===q[5].toLowerCase()?1:0),0);setResult({score,count:Object.values(answers).filter(x=>String(x).trim()).length});setStarted(false);};
  return <div className="reading-exam">
   <div className="reading-head"><div><span className="tag">{testType==='academic'?'ACADEMIC READING':'GENERAL TRAINING READING'}</span><h3>Reading test · 40 questions</h3><p>60 minutes · Complete all three passages or sections. Questions are numbered in test order.</p></div><div className="reading-clock">{String(Math.floor(remaining/60)).padStart(2,'0')}:{String(remaining%60).padStart(2,'0')}<small>TIME REMAINING</small></div></div>
   {!started&&!result&&<button className="primary" type="button" onClick={()=>setStarted(true)}>Start 60-minute Reading test →</button>}
