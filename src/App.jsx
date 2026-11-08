@@ -1,0 +1,38 @@
+import React, { useEffect, useState } from 'react';
+
+const skills = [
+  { id:'listening', name:'Listening', time:'30 minutes', detail:'Practise understanding conversations, talks and everyday situations.', icon:'◖))' },
+  { id:'reading', name:'Reading', time:'60 minutes', detail:'Build speed, accuracy and confidence with IELTS-style passages.', icon:'▤' },
+  { id:'writing', name:'Writing', time:'60 minutes', detail:'Complete Task 1 and Task 2 and receive structured AI feedback.', icon:'✎' },
+  { id:'speaking', name:'Speaking', time:'11–14 minutes', detail:'Practise Parts 1, 2 and 3 with guided response feedback.', icon:'◉' }
+];
+export default function App() {
+  const [plans,setPlans] = useState([]);
+  const [skill,setSkill] = useState('writing');
+  const [prompt,setPrompt] = useState('Some people believe that online learning is more effective than classroom learning. Discuss both views and give your opinion.');
+  const [answer,setAnswer] = useState('');
+  const [feedback,setFeedback] = useState(null);
+  const [busy,setBusy] = useState(false);
+  const [notice,setNotice] = useState('');
+  useEffect(()=>{ fetch('/api/plans').then(r=>r.json()).then(setPlans).catch(()=>setPlans([])); },[]);
+  async function assess(e) {
+    e.preventDefault(); setBusy(true); setFeedback(null); setNotice('');
+    try {
+      const r = await fetch('/api/assess',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skill,prompt,response:answer})});
+      const data = await r.json(); if(!r.ok) throw new Error(data.error || 'Assessment unavailable.');
+      setFeedback(data);
+    } catch(err) { setNotice(err.message); }
+    finally { setBusy(false); }
+  }
+  return <div className="app">
+    <header className="topbar"><a className="brand" href="#"><span className="brand-mark">IG</span> IELTS<span>Guru</span></a><nav><a href="#practice">Practice</a><a href="#plans">Plans</a><a href="#about">About</a></nav><a className="nav-cta" href="#practice">Start practising <b>→</b></a></header>
+    <main>
+      <section className="hero"><div className="hero-copy"><div className="eyebrow"><span></span> YOUR IELTS JOURNEY STARTS HERE</div><h1>Prepare smarter.<br/><em>Achieve your goal.</em></h1><p>Realistic IELTS-style practice, thoughtful feedback and a clear path to stronger English — all in one learning space.</p><div className="hero-actions"><a className="primary" href="#practice">Explore practice <b>→</b></a><a className="secondary" href="#plans">View membership plans</a></div><div className="trust"><span>✓</span> Learn at your pace <span>✓</span> Track your progress <span>✓</span> Improve with feedback</div></div><div className="hero-art"><div className="orb orb-one"></div><div className="orb orb-two"></div><div className="score-card"><div className="score-top"><span>YOUR NEXT MILESTONE</span><span className="live-dot"></span></div><div className="score-number">7.5<span> target band</span></div><div className="score-line"><i></i></div><div className="score-foot"><span>Consistent practice</span><strong>One step at a time</strong></div></div><div className="floating-note"><span>✦</span><div><b>Keep improving</b><small>Every practice counts</small></div></div><div className="hero-stamp">IELTS<br/>READY</div></div></section>
+      <section className="stats"><div><b>4</b><span>Core IELTS skills</span></div><div><b>AI</b><span>Assisted feedback</span></div><div><b>24/7</b><span>Learn on your schedule</span></div><div><b>1 goal</b><span>Your best performance</span></div></section>
+      <section className="section" id="practice"><div className="section-heading"><div><div className="eyebrow">BUILD YOUR CONFIDENCE</div><h2>Choose your practice</h2></div><p>Work on each part of the IELTS test with focused activities designed to help you improve.</p></div><div className="skill-grid">{skills.map((s,i)=><button className={'skill-card '+(skill===s.id?'selected':'')} key={s.id} onClick={()=>{setSkill(s.id);setFeedback(null);}}><span className="skill-icon">{s.icon}</span><span className="skill-index">0{i+1}</span><h3>{s.name}</h3><p>{s.detail}</p><span className="skill-time">{s.time} <b>↗</b></span></button>)}</div></section>
+      <section className="practice-panel"><div className="practice-intro"><div className="eyebrow">YOUR PRACTICE WORKSPACE</div><h2>Learn. Practise.<br/><em>Get better.</em></h2><p>Submit a response to receive AI-assisted suggestions. Feedback is intended for learning and is not an official IELTS result.</p><div className="practice-bullets"><span>✓ Clear improvement points</span><span>✓ Language corrections</span><span>✓ Estimated practice band where appropriate</span></div></div><form className="practice-form" onSubmit={assess}><div className="form-head"><div><small>SELECTED MODULE</small><h3>{skills.find(s=>s.id===skill)?.name} practice</h3></div><span className="tag">AI FEEDBACK</span></div><label htmlFor="task">Practice question / task</label><textarea id="task" rows="3" value={prompt} onChange={e=>setPrompt(e.target.value)} required/><label htmlFor="answer">Your answer</label><textarea id="answer" rows="7" placeholder="Write or paste your response here..." value={answer} onChange={e=>setAnswer(e.target.value)} required/><div className="form-bottom"><small>{answer.length} / 12,000 characters</small><button className="primary" disabled={busy || !answer.trim()}>{busy?'Reviewing…':'Get AI feedback →'}</button></div>{notice&&<p className="notice">{notice}</p>}{feedback&&<div className="feedback"><div className="feedback-top"><b>Your practice feedback</b><strong>{feedback.estimated_band ?? '—'} <small>estimated band</small></strong></div><p>{feedback.summary}</p><h4>What went well</h4><ul>{(feedback.strengths||[]).map((x,i)=><li key={i}>{x}</li>)}</ul><h4>Areas to improve</h4><ul>{(feedback.improvements||[]).map((x,i)=><li key={i}>{x}</li>)}</ul><h4>Suggested corrections</h4>{(feedback.corrections||[]).map((x,i)=><p className="correction" key={i}><s>{x.original}</s> → {x.suggestion}</p>)}<small>{feedback.disclaimer}</small></div>}</form></section>
+      <section className="section plans" id="plans"><div className="section-heading"><div><div className="eyebrow">FLEXIBLE LEARNING</div><h2>Plans for your progress</h2></div><p>Choose a membership that matches your preparation goals. Pricing and packages will be manageable from the administrator dashboard.</p></div><div className="plan-grid">{plans.map(p=><article className="plan-card" key={p.id}><span className="plan-label">IELTS GURU PLAN</span><h3>{p.name}</h3><div className="price">₦{Number(p.price_ngn).toLocaleString('en-NG')}<small> / {p.duration_days} days</small></div><ul>{(Array.isArray(p.features)?p.features:[]).map((f,i)=><li key={i}>✓ {f}</li>)}</ul><a className="plan-link" href="#practice">Get started →</a></article>)}</div><p className="coming">Secure online subscription checkout will be enabled after payment credentials are configured.</p></section>
+      <section className="closing" id="about"><div><div className="eyebrow">SMALL STEPS. STRONGER RESULTS.</div><h2>Your IELTS goal is<br/><em>worth preparing for.</em></h2></div><a className="primary" href="#practice">Start your practice →</a></section>
+    </main><footer><a className="brand" href="#"><span className="brand-mark">IG</span> IELTS<span>Guru</span></a><span>© {new Date().getFullYear()} IELTS Guru. Independent IELTS preparation platform.</span><span>AI scores are practice estimates, not official IELTS results.</span></footer>
+  </div>;
+}
