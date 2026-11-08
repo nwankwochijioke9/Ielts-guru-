@@ -54,18 +54,62 @@ const questions=[
 [39,'Multiple choice','What limitation can affect digital surveys?','choice',['They may attract a limited type of respondent','They cannot be completed online','They take several hours'],'A'],
 [40,'Short-answer questions','How should institutions treat evaluation results?','text',[],'cautiously']
 ];
+const generalQuestions=[
+[1,'Multiple choice','When is Riverside Community Centre closed?','choice',['Saturday','Sunday','Tuesday'],'B'],
+[2,'Short-answer questions','How many days ahead can the sports hall be booked?','text',[],'seven days'],
+[3,'True / False / Not Given','The pool closes every Tuesday morning.','tfng',[],'TRUE'],
+[4,'True / False / Not Given','Swimming lessons are free on Sundays.','tfng',[],'NOT GIVEN'],
+[5,'Sentence completion','The centre closes at ______ pm on weekdays.','text',[],'9'],
+[6,'Matching information','Which facility offers computer sessions?','choice',['Riverside Centre','Green Street Library'],'B'],
+[7,'Short-answer questions','How long is a free computer session?','text',[],'45 minutes'],
+[8,'True / False / Not Given','Late books can be returned through an entrance slot.','tfng',[],'TRUE'],
+[9,'Multiple choice','Who should users speak to about longer computer access?','choice',['The librarian','The manager','The caretaker'],'A'],
+[10,'Matching features','Which place opens at 7 am on weekdays?','choice',['Riverside Centre','Green Street Library'],'A'],
+[11,'Sentence completion','The library opens at ______ am on Saturdays.','text',[],'10'],
+[12,'Yes / No / Not Given','The library charges for every computer session.','yng',[],'NO'],
+[13,'Short-answer questions','Where is the book-return slot?','text',[],'beside the main entrance'],
+[14,'Multiple choice','When must new employees complete induction?','choice',['During their first week','After six months','Before applying'],'A'],
+[15,'Matching information','Which programme covers fire procedures and data protection?','choice',['Induction','Machinery training','External course'],'A'],
+[16,'True / False / Not Given','Employees can operate machinery alone before safety training.','tfng',[],'FALSE'],
+[17,'Sentence completion','Training requests must be made ten working days before the ______.','text',[],'course'],
+[18,'Short-answer questions','Who receives training requests?','text',[],'department manager'],
+[19,'Yes / No / Not Given','The company normally pays for relevant job training.','yng',[],'YES'],
+[20,'True / False / Not Given','Employees must hand their original certificates to the manager.','tfng',[],'NOT GIVEN'],
+[21,'Matching features','Who needs practical safety training before using machinery alone?','choice',['All staff','Machinery staff','Visitors'],'B'],
+[22,'Summary completion','Induction includes the correct use of ______.','text',[],'equipment'],
+[23,'Multiple choice','What is the purpose of induction?','choice',['Explain essential workplace procedures','Choose managers','Set salaries'],'A'],
+[24,'Matching sentence endings','Course fees are normally paid when training is…','choice',['unrelated to the role','relevant to the current role','optional for visitors'],'B'],
+[25,'Yes / No / Not Given','Employees should keep copies of certificates.','yng',[],'YES'],
+[26,'Short-answer questions','How many working days’ notice is needed for training requests?','text',[],'ten'],
+[27,'Multiple choice','What is a repair café?','choice',['A shop selling appliances','A community repair event','A recycling factory'],'B'],
+[28,'True / False / Not Given','Repair cafés accept every household item.','tfng',[],'FALSE'],
+[29,'Sentence completion','Volunteers help people repair items rather than ______ them.','text',[],'discard'],
+[30,'Short-answer questions','Name one item people may bring.','text',[],'clothing'],
+[31,'Yes / No / Not Given','Repair cafés exist only to save people money.','yng',[],'NO'],
+[32,'Matching information','Which section describes an activity bringing neighbours together?','choice',['Section 1','Section 2','Section 3'],'C'],
+[33,'Matching headings','Choose the best heading for Section 3.','choice',['Community repair events','Buying new products','Local council offices'],'A'],
+[34,'Summary completion','Visitors can exchange practical ______.','text',[],'skills'],
+[35,'True / False / Not Given','Demand is highest after the events become established.','tfng',[],'FALSE'],
+[36,'Multiple choice','What may local authorities provide?','choice',['Venues','Replacement parts','Paid volunteers'],'A'],
+[37,'Short-answer questions','What do groups need donations to buy?','text',[],'tools and replacement parts'],
+[38,'Yes / No / Not Given','Organisers guarantee that every object can be repaired.','yng',[],'NO'],
+[39,'Matching features','What must come before saving an object?','choice',['Speed','Safety','Low cost'],'B'],
+[40,'Sentence completion','Repair café success depends on volunteers and suitable ______.','text',[],'equipment']
+];
+
 export default function ReadingExam({testType='academic',onClose}){
  const [remaining,setRemaining]=useState(3600),[started,setStarted]=useState(false),[answers,setAnswers]=useState({}),[result,setResult]=useState(null);
  useEffect(()=>{if(!started)return;const t=setInterval(()=>setRemaining(v=>{if(v<=1){clearInterval(t);setStarted(false);return 0;}return v-1;}),1000);return()=>clearInterval(t);},[started]);
+ const questionSet=testType==='academic'?questions:generalQuestions;
  const set=(n,v)=>setAnswers(a=>({...a,[n]:v}));
- const submit=()=>{const score=questions.reduce((s,q)=>s+(String(answers[q[0]]||'').trim().toLowerCase()===q[6].toLowerCase()?1:0),0);setResult({score,count:Object.values(answers).filter(x=>String(x).trim()).length});setStarted(false);};
+ const submit=()=>{const score=questionSet.reduce((s,q)=>s+(String(answers[q[0]]||'').trim().toLowerCase()===q[6].toLowerCase()?1:0),0);setResult({score,count:Object.values(answers).filter(x=>String(x).trim()).length});setStarted(false);};
  return <div className="reading-exam">
   <div className="reading-head"><div><span className="tag">{testType==='academic'?'ACADEMIC READING':'GENERAL TRAINING READING'}</span><h3>Reading test · 40 questions</h3><p>60 minutes · Complete all three passages or sections. Questions are numbered in test order.</p></div><div className="reading-clock">{String(Math.floor(remaining/60)).padStart(2,'0')}:{String(remaining%60).padStart(2,'0')}<small>TIME REMAINING</small></div></div>
   {!started&&!result&&<button className="primary" type="button" onClick={()=>setStarted(true)}>Start 60-minute Reading test →</button>}
   {remaining===0&&!result&&<p className="notice">Time has ended. Submit your answers to see your result.</p>}
-  <div className="reading-columns"><div className="reading-texts">{passages[testType].map(p=><article className="reading-passage" key={p.title}><h4>{p.title}</h4><p>{p.text}</p></article>)}</div><div className="reading-questions"><h4>Questions 1–40</h4><p className="reading-instructions">Follow each instruction. Select an option, choose TRUE / FALSE / NOT GIVEN or YES / NO / NOT GIVEN, or type a short answer.</p>{questions.map(q=><div className="reading-question" key={q[0]}><div><b>{q[0]}.</b> <span className="question-type">{q[1]}</span></div><p>{q[2]}</p>{q[3]==='choice'?<div className="reading-options">{q[4].map((o,i)=>{const v=String.fromCharCode(65+i);return <label key={v}><input type="radio" name={'q'+q[0]} checked={answers[q[0]]===v} onChange={()=>set(q[0],v)} disabled={!started}/><span>{v}. {o}</span></label>;})}</div>:q[3]==='tfng'||q[3]==='yng'?<select value={answers[q[0]]||''} onChange={e=>set(q[0],e.target.value)} disabled={!started}><option value="">Choose answer</option>{(q[3]==='tfng'?['TRUE','FALSE','NOT GIVEN']:['YES','NO','NOT GIVEN']).map(v=><option key={v}>{v}</option>)}</select>:<input className="reading-short-answer" value={answers[q[0]]||''} onChange={e=>set(q[0],e.target.value)} placeholder="Type your answer" disabled={!started}/>}</div>)}</div></div>
+  <div className="reading-columns"><div className="reading-texts">{passages[testType].map(p=><article className="reading-passage" key={p.title}><h4>{p.title}</h4><p>{p.text}</p></article>)}</div><div className="reading-questions"><h4>Questions 1–40</h4><p className="reading-instructions">Follow each instruction. Select an option, choose TRUE / FALSE / NOT GIVEN or YES / NO / NOT GIVEN, or type a short answer.</p>{questionSet.map(q=><div className="reading-question" key={q[0]}><div><b>{q[0]}.</b> <span className="question-type">{q[1]}</span></div><p>{q[2]}</p>{q[3]==='choice'?<div className="reading-options">{q[4].map((o,i)=>{const v=String.fromCharCode(65+i);return <label key={v}><input type="radio" name={'q'+q[0]} checked={answers[q[0]]===v} onChange={()=>set(q[0],v)} disabled={!started}/><span>{v}. {o}</span></label>;})}</div>:q[3]==='tfng'||q[3]==='yng'?<select value={answers[q[0]]||''} onChange={e=>set(q[0],e.target.value)} disabled={!started}><option value="">Choose answer</option>{(q[3]==='tfng'?['TRUE','FALSE','NOT GIVEN']:['YES','NO','NOT GIVEN']).map(v=><option key={v}>{v}</option>)}</select>:<input className="reading-short-answer" value={answers[q[0]]||''} onChange={e=>set(q[0],e.target.value)} placeholder="Type your answer" disabled={!started}/>}</div>)}</div></div>
   <div className="reading-submit"><span>{Object.values(answers).filter(v=>String(v).trim()).length} / 40 answered</span><button type="button" className="primary" onClick={submit} disabled={!started&&remaining!==0}>Submit Reading test →</button></div>
   {result&&<div className="reading-result"><h3>Your Reading practice result</h3><strong>{result.score} / 40</strong><p>{result.count} questions answered. This is a raw practice score, not an official IELTS band. Band conversion varies by test version and between Academic and General Training.</p><button className="primary" type="button" onClick={()=>{setRemaining(3600);setAnswers({});setResult(null);setStarted(false);}}>Retake test</button></div>}
-  <p className="reading-disclaimer">Original IELTS-format practice questions, not official IELTS exam content. This is a prototype question set: the General Training text style is different, but its complete question bank and task distribution still need further refinement against IELTS specifications.</p>
+  <p className="reading-disclaimer">Original practice questions, not official IELTS exam content. Academic and General Training have separate texts and answer keys. IELTS task combinations vary between test versions; this prototype uses a representative range of IELTS task formats.</p>
  </div>;
 }
