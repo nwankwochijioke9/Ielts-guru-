@@ -45,15 +45,52 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
     const source = sets[testType] || sets.academic;
     const shuffle = items => [...items].sort(() => Math.random() - 0.5);
     const cueCards = testType === 'academic' ? [
-      source.cue,
-      'Describe a place you visited that made a strong impression on you.\\n\\nYou should say:\\n• where the place is\\n• when you visited it\\n• what you did there\\nand explain why the place made such a strong impression on you.',
-      'Describe an important decision you made.\\n\\nYou should say:\\n• what the decision was\\n• when you made it\\n• what factors influenced you\\nand explain how the decision affected your life.'
+      { cue: `Describe a skill you would like to learn.
+
+You should say:
+• what the skill is
+• why you would like to learn it
+• how you would learn it
+and explain how this skill could help you.`, part3: ['Why do adults decide to learn new skills?', 'Should schools give more attention to practical skills?', 'How has technology changed the way people learn?', 'Do people learn better independently or with a teacher?'] },
+      { cue: `Describe a place you visited that made a strong impression on you.
+
+You should say:
+• where the place is
+• when you visited it
+• what you did there
+and explain why the place made such a strong impression on you.`, part3: ['Why do some places attract more visitors than others?', 'How can tourism benefit local communities?', 'Should governments spend more money protecting historic places?', 'How might travel habits change in the future?'] },
+      { cue: `Describe an important decision you made.
+
+You should say:
+• what the decision was
+• when you made it
+• what factors influenced you
+and explain how the decision affected your life.`, part3: ['Why do some people find decision-making difficult?', 'Should young people make important decisions independently?', 'How do people balance short-term and long-term benefits?', 'Do people rely too much on advice from others?'] }
     ] : [
-      source.cue,
-      'Describe a useful service in your local area.\\n\\nYou should say:\\n• what the service is\\n• where people can use it\\n• who benefits from it\\nand explain why it is useful to the community.',
-      'Describe a journey you remember well.\\n\\nYou should say:\\n• where you went\\n• how you travelled\\n• who you travelled with\\nand explain why you remember this journey.'
+      { cue: `Describe a person who has helped you.
+
+You should say:
+• who the person is
+• how the person helped you
+• when this happened
+and explain how you felt about the help you received.`, part3: ['Why is it important for people to help one another?', 'Should children be encouraged to volunteer?', 'How can local communities support people in difficulty?', 'Do people help strangers as much as they used to?'] },
+      { cue: `Describe a useful service in your local area.
+
+You should say:
+• what the service is
+• where people can use it
+• who benefits from it
+and explain why it is useful to the community.`, part3: ['Which public services are most important in a community?', 'Who should be responsible for improving local services?', 'How can technology make public services more accessible?', 'Should people pay more for better public services?'] },
+      { cue: `Describe a journey you remember well.
+
+You should say:
+• where you went
+• how you travelled
+• who you travelled with
+and explain why you remember this journey.`, part3: ['How has transport changed the way people travel?', 'What are the advantages of public transport?', 'Should governments discourage people from using private cars?', 'How might journeys change in the next twenty years?'] }
     ];
-    return { ...source, part1: shuffle(source.part1).slice(0, 2), cue: cueCards[Math.floor(Math.random() * cueCards.length)], part3: shuffle(source.part3) };
+    const selectedCue = cueCards[Math.floor(Math.random() * cueCards.length)];
+    return { ...source, part1: shuffle(source.part1).slice(0, 2), cue: selectedCue.cue, part3: selectedCue.part3 };
   });
 
   useEffect(() => {
