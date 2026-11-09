@@ -63,14 +63,20 @@ export default function ListeningExam({testType='academic',testMode='practice',o
   try{
    const response=await fetch('/api/listening-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script:parts[activePart].script})});
    if(!response.ok)throw new Error('Natural audio is unavailable');
-   const blob=await response.blob();
-   const url=URL.createObjectURL(blob);
-   const audio=new Audio(url);
-   audioRef.current=audio;
-   audio.onended=()=>{setPlaying(false);setPlayed(p=>({...p,[activePart]:true}));URL.revokeObjectURL(url);};
-   audio.onerror=()=>{setPlaying(false);URL.revokeObjectURL(url);};
-   await audio.play();
+   const payload=await response.json();
+   if(!Array.isArray(payload.segments)||!payload.segments.length)throw new Error('Audio segments are unavailable');
    setPlaying(true);
+   for(const segment of payload.segments){
+    await new Promise((resolve,reject)=>{
+     const audio=new Audio('data:audio/mpeg;base64,'+segment.audio);
+     audioRef.current=audio;
+     audio.onended=resolve;
+     audio.onerror=()=>reject(new Error('A speaker recording could not be played'));
+     audio.play().catch(reject);
+    });
+   }
+   setPlaying(false);
+   setPlayed(p=>({...p,[activePart]:true}));
   }catch{
    if(typeof window==='undefined'||!window.speechSynthesis){setAudioLoading(false);alert('Audio playback is not supported in this browser.');return;}
    const utterance=new SpeechSynthesisUtterance(parts[activePart].script);
@@ -85,7 +91,7 @@ export default function ListeningExam({testType='academic',testMode='practice',o
  const submit=()=>{stop();const score=questions.reduce((n,q)=>{const response=norm(answers[q[0]]);const expected=q[3]==='choice'?q[5]:q[4];const aliases={2:['14th of may','the fourteenth of may'],4:['£84','84 pounds'],9:['07942618350','07942-618350'],16:['10:30','half past ten','half past 10'],26:['weekend']};const accepted=[expected,...(aliases[q[0]]||[])];return n+(accepted.some(v=>response===norm(v))?1:0);},0);const answered=Object.values(answers).filter(v=>String(v||'').trim()).length;setResult({score,answered});onComplete?.({score,answered,total:40});};
  return <div className="listening-exam">
   <div className="listening-top"><div><span className="tag">IELTS LISTENING · {testType==='academic'?'ACADEMIC':'GENERAL TRAINING'}</span><h3>Listening test · 40 questions</h3><p>4 parts · approximately 30 minutes · 10 questions per part. In mock mode, complete each recording in order; each part can be played once.</p></div><div className="listening-progress">{mock?String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0'):Object.values(answers).filter(v=>String(v||'').trim()).length}<small>{mock?' time left':' / 40 answered'}</small></div></div>
-  <div className="listening-notice"><b>Audio format note:</b> The portal generates a natural British English voice track when AI audio is configured. If it is unavailable, your browser’s speech voice is used as a fallback. These are original practice scripts, not official IELTS recordings.</div>
+  <div className="listening-notice"><b>Audio format note:</b> Conversations use distinct AI voices for each speaker, while talks and lectures use a single presenter. If AI audio is unavailable, your browser’s speech voice is used as a fallback. These are original practice scripts, not official IELTS recordings.</div>
   {mock&&remaining===0&&<p className="notice">The 30-minute test time has ended. Submit your answers to see your result.</p>}<div className="listening-part-tabs">{parts.map((p,i)=><button type="button" className={activePart===i?'active':''} key={p.title} onClick={()=>{stop();setActivePart(i);}} disabled={mock&&i>0&&!played[i-1]}>{'Part '+(i+1)}</button>)}</div>
   <div className="listening-player"><div><small>NOW PLAYING · PART {activePart+1}</small><h4>{parts[activePart].title}</h4><p>{parts[activePart].context}</p></div><div className="listening-controls"><button type="button" className="primary" onClick={play} disabled={playing||audioLoading||(mock&&(played[activePart]||remaining===0))}>{audioLoading?'Preparing audio…':playing?'Playing…':played[activePart]?(mock?'Recording played':'Play again'):'▶ Play recording'}</button><button type="button" className="secondary" onClick={stop} disabled={!playing}>Stop</button></div>{mock&&played[activePart]&&<small className="played-note">Mock mode: this part has been played once.</small>}</div>
   <div className="listening-questions"><h4>Part {activePart+1} questions</h4><p className="reading-instructions">Listen to the recording and answer the questions in this part. You can move between parts.</p>{questions.filter(q=>Math.ceil(q[0]/10)===activePart+1).map(q=><div className="listening-question" key={q[0]}><div><b>{q[0]}.</b> <span className="question-type">{q[1]}</span></div><p>{q[2]}</p>{q[3]==='choice'?<div className="reading-options">{q[3+1].map((v,i)=>{const k=String.fromCharCode(65+i);return <label key={k}><input type="radio" name={'listen'+q[0]} checked={answers[q[0]]===k} onChange={()=>setAnswers(a=>({...a,[q[0]]:k}))} disabled={mock&&remaining===0}/><span>{k}. {v}</span></label>;})}</div>:<input className="reading-short-answer" value={answers[q[0]]||''} onChange={e=>setAnswers(a=>({...a,[q[0]]:e.target.value}))} placeholder="Your answer" disabled={mock&&remaining===0}/>}</div>)}</div>
