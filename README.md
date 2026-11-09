@@ -30,12 +30,9 @@ An independent IELTS preparation website built with React, Vite, Express and Pos
 - Listening and Reading need properly authored questions, audio, answer keys and validated scoring before they can simulate a full exam.
 - Do not collect real payments or sensitive learner data until authentication, payment verification/webhooks, privacy controls, security review and backups are implemented.
 
-## Still to build
-- Learner registration, secure sign-in, account dashboard and subscription entitlements.
+## Remaining product work
 - Full IELTS exam flows with timers, navigation, autosave, audio player and validated answer keys.
 - Speaking audio capture and assessment.
-- Flutterwave checkout and signed webhook verification.
-- Admin dashboard UI for creating/editing packages and reviewing learners.
 - Automated tests, production monitoring and security review.
 
 
