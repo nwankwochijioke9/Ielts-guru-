@@ -139,7 +139,7 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Speaking assessment is unavailable.');
       setFeedback(data);
-      onComplete?.();
+      onComplete?.({estimatedBand:data.estimated_band??null,summary:data.summary??''});
     } catch (err) {
       setError(err.message || 'Unable to submit your recording. Please try again.');
     } finally {
