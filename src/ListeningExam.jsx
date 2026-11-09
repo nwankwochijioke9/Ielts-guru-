@@ -50,7 +50,8 @@ const questions=[
 ];
 const norm=s=>String(s||'').trim().toLowerCase().replace(/[.,]/g,'').replace(/\s+/g,' ');
 export default function ListeningExam({testType='academic',testMode='practice'}){
- const [answers,setAnswers]=useState({}),[activePart,setActivePart]=useState(0),[playing,setPlaying]=useState(false),[audioLoading,setAudioLoading]=useState(false),[played,setPlayed]=useState({}),[result,setResult]=useState(null),[remaining,setRemaining]=useState(1800),[timerStarted,setTimerStarted]=useState(false);\n const audioRef=useRef(null);
+ const [answers,setAnswers]=useState({}),[activePart,setActivePart]=useState(0),[playing,setPlaying]=useState(false),[audioLoading,setAudioLoading]=useState(false),[played,setPlayed]=useState({}),[result,setResult]=useState(null),[remaining,setRemaining]=useState(1800),[timerStarted,setTimerStarted]=useState(false);
+ const audioRef=useRef(null);
  const mock=testMode==='mock';
  useEffect(()=>()=>{if(typeof window!=='undefined'&&window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.src='';}},[]);
  useEffect(()=>{if(!mock||!timerStarted)return;const timer=setInterval(()=>setRemaining(v=>{if(v<=1){clearInterval(timer);setTimerStarted(false);if(window.speechSynthesis)window.speechSynthesis.cancel();setPlaying(false);return 0;}return v-1;}),1000);return()=>clearInterval(timer);},[mock,timerStarted]);
