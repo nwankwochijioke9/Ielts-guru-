@@ -39,7 +39,7 @@ async function initDb() {
 }
 app.post('/api/auth/register', async (req,res) => {
   const email=String(req.body?.email||'').trim().toLowerCase(); const password=String(req.body?.password||'');
-  if(!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email) || email.length>254) return res.status(400).json({error:'Enter a valid email address.'});
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length>254) return res.status(400).json({error:'Enter a valid email address.'});
   if(password.length<10 || password.length>128) return res.status(400).json({error:'Use a password between 10 and 128 characters.'});
   if(!pool) return res.status(503).json({error:'Account creation is temporarily unavailable.'});
   try { const passwordHash=await hashPassword(password); const {rows}=await pool.query('INSERT INTO learners(email,password_hash) VALUES($1,$2) RETURNING id,email',[email,passwordHash]); const learner=rows[0]; const token=randomBytes(32).toString('base64url'); await pool.query('INSERT INTO learner_sessions(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+($3 * INTERVAL \'1 day\'))',[learner.id,hashToken(token),SESSION_DAYS]); setSessionCookie(res,token); const trial=await getTrial(learner.id); res.status(201).json({user:learner,trial:{active:trial.active,days_left:trial.days_left,expires_at:trial.expires_at,ai_reviews_used:trial.ai_reviews_used}}); }
@@ -86,6 +86,8 @@ app.post('/api/assess', requireLearner, async (req, res) => {
   if (skill !== 'writing') return res.status(403).json({ error: 'The free trial includes one introductory AI Writing review. Subscribe to unlock AI feedback for all four skills.', code: 'UPGRADE_REQUIRED' });
   if (trial.ai_reviews_used >= 1) return res.status(403).json({ error: 'You have used your free AI Writing review. Subscribe to unlock unlimited practice feedback.', code: 'TRIAL_LIMIT_REACHED' });
   if (!openai) return res.status(503).json({ error: 'AI marking is not configured yet. Add OPENAI_API_KEY in Render environment settings.' });
+  const reservation = await pool.query('UPDATE free_trials SET ai_reviews_used=ai_reviews_used+1 WHERE user_id=$1 AND ai_reviews_used<1 AND expires_at>NOW() RETURNING ai_reviews_used',[req.learner.id]);
+  if (!reservation.rowCount) return res.status(403).json({ error: 'Your free AI Writing review has already been used. Choose a membership to continue.', code: 'TRIAL_LIMIT_REACHED' });
   try {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -97,9 +99,8 @@ app.post('/api/assess', requireLearner, async (req, res) => {
     });
     const feedback = JSON.parse(completion.choices[0].message.content || '{}');
     await pool.query('INSERT INTO practice_attempts(skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5)', [skill,prompt,response,feedback.estimated_band ?? null,JSON.stringify(feedback)]);
-    await pool.query('UPDATE free_trials SET ai_reviews_used=ai_reviews_used+1 WHERE user_id=$1',[req.learner.id]);
     res.json({ ...feedback, disclaimer: 'AI-generated practice estimate only; not an official IELTS score.' });
-  } catch { res.status(500).json({ error: 'Assessment failed. Please try again.' }); }
+  } catch { await pool.query('UPDATE free_trials SET ai_reviews_used=GREATEST(0,ai_reviews_used-1) WHERE user_id=$1',[req.learner.id]).catch(()=>{}); res.status(500).json({ error: 'Assessment failed. Please try again.' }); }
 });
 
 app.post('/api/assess-speaking', requireLearner, async (req, res) => {
@@ -136,7 +137,9 @@ app.post('/api/assess-speaking', requireLearner, async (req, res) => {
   }
 });
 
-app.post('/api/listening-audio', async (req, res) => {
+app.post('/api/listening-audio', requireLearner, async (req, res) => {
+  const trial = await getTrial(req.learner.id);
+  if (!trial.active) return res.status(403).json({ error: 'Your 3-day trial has ended. Subscribe to continue practising.' });
   const { script } = req.body || {};
   if (typeof script !== 'string' || !script.trim() || script.length > 10000) return res.status(400).json({ error: 'A valid listening script is required.' });
   if (!openai) return res.status(503).json({ error: 'Natural AI audio is not configured. Add OPENAI_API_KEY in Render environment settings.' });
