@@ -31,3 +31,10 @@ FROM (VALUES
  ('VIP',50000,39,'["Everything in Premium","Highest AI assessment allowance","Advanced performance analytics","Personalised study plan","Priority access to new practice materials","Comprehensive progress reports"]')
 ) AS seed(name,price_ngn,price_usd,features)
 WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name=seed.name);
+
+CREATE TABLE IF NOT EXISTS free_trials (
+  trial_id TEXT PRIMARY KEY,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '5 days'),
+  ai_reviews_used INTEGER NOT NULL DEFAULT 0 CHECK (ai_reviews_used >= 0)
+);
