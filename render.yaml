@@ -25,3 +25,11 @@ services:
         generateValue: true
       - key: FLW_SECRET_KEY
         sync: false
+      - key: FLW_WEBHOOK_HASH
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: APP_URL
+        value: https://ielts-guru.onrender.com
