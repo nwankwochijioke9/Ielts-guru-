@@ -32,13 +32,29 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [recorded, setRecorded] = useState(false);
+  const [part1TopicIndex, setPart1TopicIndex] = useState(0);
+  const [part1QuestionIndex, setPart1QuestionIndex] = useState(0);
+  const [part3QuestionIndex, setPart3QuestionIndex] = useState(0);
   const recorderRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
   const blobRef = useRef(null);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
-  const questions = sets[testType] || sets.academic;
+  const [questions] = useState(() => {
+    const source = sets[testType] || sets.academic;
+    const shuffle = items => [...items].sort(() => Math.random() - 0.5);
+    const cueCards = testType === 'academic' ? [
+      source.cue,
+      'Describe a place you visited that made a strong impression on you.\\n\\nYou should say:\\n• where the place is\\n• when you visited it\\n• what you did there\\nand explain why the place made such a strong impression on you.',
+      'Describe an important decision you made.\\n\\nYou should say:\\n• what the decision was\\n• when you made it\\n• what factors influenced you\\nand explain how the decision affected your life.'
+    ] : [
+      source.cue,
+      'Describe a useful service in your local area.\\n\\nYou should say:\\n• what the service is\\n• where people can use it\\n• who benefits from it\\nand explain why it is useful to the community.',
+      'Describe a journey you remember well.\\n\\nYou should say:\\n• where you went\\n• how you travelled\\n• who you travelled with\\nand explain why you remember this journey.'
+    ];
+    return { ...source, part1: shuffle(source.part1).slice(0, 2), cue: cueCards[Math.floor(Math.random() * cueCards.length)], part3: shuffle(source.part3) };
+  });
 
   useEffect(() => {
     if (!recording) return;
@@ -154,13 +170,21 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
     </div>
     {phase === 'intro' && <div className="speaking-start">
       <h4>Before you begin</h4>
-      <ul><li>Find a quiet place and allow microphone access.</li><li>Speak naturally and answer in complete sentences.</li><li>Keep recording throughout all three parts for a more realistic interview.</li><li>Your audio is sent securely to the configured AI service for transcription and practice feedback.</li></ul>
+      <ul><li>Find a quiet place and allow microphone access.</li><li>Speak naturally and answer in complete sentences.</li><li>The examiner will move through questions one at a time. Keep recording throughout all three parts.</li><li>Your audio is submitted to the configured AI service for transcription and practice feedback after the interview.</li></ul>
       <button className="primary" type="button" onClick={startRecording}>Allow microphone & start interview →</button>
     </div>}
     {phase === 'part1' && <section className="speaking-part">
       <span className="tag">PART 1 · 4–5 MINUTES</span><h4>Introduction and interview</h4><p>Answer the examiner’s questions about familiar topics. Aim for natural answers of two to four sentences. The section advances after its allotted time.</p><div className="prep-clock">{clock(stageRemaining)}<small>PART 1 TIME REMAINING</small></div>
-      {questions.part1.map((group, i) => <article className="speaking-topic" key={group[0]}><b>{group[0]}</b>{group.slice(1).map((q, j) => <p key={j}>{i * 3 + j + 1}. {q}</p>)}</article>)}
-      <button className="primary" type="button" disabled={!recording} onClick={() => { setPhase('prep'); setPrepSeconds(60); setPreparing(true); }}>Continue to Part 2 →</button>
+      <article className="speaking-topic">
+        <b>Topic: {questions.part1[part1TopicIndex]?.[0]}</b>
+        <p className="speaking-question">{questions.part1[part1TopicIndex]?.[part1QuestionIndex + 1]}</p>
+        <small>Question {part1QuestionIndex + 1} of 3 · Topic {part1TopicIndex + 1} of {questions.part1.length}</small>
+      </article>
+      <button className="primary" type="button" disabled={!recording} onClick={() => {
+        if (part1QuestionIndex < 2) setPart1QuestionIndex(index => index + 1);
+        else if (part1TopicIndex < questions.part1.length - 1) { setPart1TopicIndex(index => index + 1); setPart1QuestionIndex(0); }
+        else { setPhase('prep'); setPrepSeconds(60); setPreparing(true); }
+      }}>{part1QuestionIndex < 2 || part1TopicIndex < questions.part1.length - 1 ? 'Next examiner question →' : 'Continue to Part 2 →'}</button>
     </section>}
     {phase === 'prep' && <section className="speaking-part">
       <span className="tag">PART 2 · PREPARATION</span><h4>Individual long turn</h4><p>You have one minute to prepare. You may make brief notes, then speak for up to two minutes.</p>
@@ -174,8 +198,15 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
     </section>}
     {phase === 'part3' && <section className="speaking-part">
       <span className="tag">PART 3 · 4–5 MINUTES</span><h4>Two-way discussion</h4><p>Give developed answers, explain your opinions and support them with reasons or examples. The interview ends when the discussion time expires.</p><div className="prep-clock">{clock(stageRemaining)}<small>PART 3 TIME REMAINING</small></div>
-      {questions.part3.map((q, i) => <p className="speaking-question" key={i}>{i + 1}. {q}</p>)}
-      <button className="primary" type="button" onClick={stopRecording}>Finish interview →</button>
+      <article className="speaking-topic">
+        <b>Discussion question {part3QuestionIndex + 1} of {questions.part3.length}</b>
+        <p className="speaking-question">{questions.part3[part3QuestionIndex]}</p>
+        <small>Develop your answer with reasons, comparisons or examples.</small>
+      </article>
+      <button className="primary" type="button" onClick={() => {
+        if (part3QuestionIndex < questions.part3.length - 1) setPart3QuestionIndex(index => index + 1);
+        else stopRecording();
+      }}>{part3QuestionIndex < questions.part3.length - 1 ? 'Next discussion question →' : 'Finish interview →'}</button>
     </section>}
     {recording && <div className="recording-status"><span className="recording-dot"></span> Microphone recording · Keep speaking naturally <button type="button" onClick={stopRecording}>End recording</button></div>}
     {phase === 'complete' && <section className="speaking-part">
