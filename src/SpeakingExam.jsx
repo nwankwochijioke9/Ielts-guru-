@@ -27,6 +27,7 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
   const [preparing, setPreparing] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [prepSeconds, setPrepSeconds] = useState(60);
+  const [stageRemaining, setStageRemaining] = useState(270);
   const [feedback, setFeedback] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -45,6 +46,25 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
     return () => clearInterval(id);
   }, [recording]);
 
+  useEffect(() => {
+    if (!recording || !['part1', 'part2', 'part3'].includes(phase)) return;
+    const duration = phase === 'part2' ? 120 : 270;
+    setStageRemaining(duration);
+    const id = setInterval(() => setStageRemaining(value => {
+      if (value <= 1) {
+        clearInterval(id);
+        if (phase === 'part1') { setPreparing(true); setPrepSeconds(60); setPhase('prep'); }
+        else if (phase === 'part2') { setPhase('part3'); }
+        else {
+          if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+          setRecording(false); setPreparing(false); setPhase('complete');
+        }
+        return 0;
+      }
+      return value - 1;
+    }), 1000);
+    return () => clearInterval(id);
+  }, [phase, recording]);
   useEffect(() => {
     if (!preparing) return;
     const id = setInterval(() => setPrepSeconds(s => {
@@ -129,7 +149,7 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
 
   return <div className="speaking-exam">
     <div className="reading-head">
-      <div><span className="tag">{testType === 'academic' ? 'ACADEMIC' : 'GENERAL TRAINING'} SPEAKING · {testMode === 'mock' ? 'MOCK TEST' : 'PRACTICE TEST'}</span><h3>{testMode === 'mock' ? 'Mock Speaking interview' : 'Speaking practice interview'} · Parts 1–3</h3><p>11–14 minutes · Record one continuous interview, then receive AI-assisted feedback.</p></div>
+      <div><span className="tag">{testType === 'academic' ? 'ACADEMIC' : 'GENERAL TRAINING'} SPEAKING · {testMode === 'mock' ? 'MOCK TEST' : 'PRACTICE TEST'}</span><h3>{testMode === 'mock' ? 'Mock Speaking interview' : 'Speaking practice interview'} · Parts 1–3</h3><p>11–14 minutes · Part 1: 4–5 min · Part 2: 1 min preparation + up to 2 min speaking · Part 3: 4–5 min.</p></div>
       <div className="reading-clock">{clock(seconds)}<small>{recording ? 'RECORDING TIME' : 'ELAPSED TIME'}</small></div>
     </div>
     {phase === 'intro' && <div className="speaking-start">
@@ -138,7 +158,7 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
       <button className="primary" type="button" onClick={startRecording}>Allow microphone & start interview →</button>
     </div>}
     {phase === 'part1' && <section className="speaking-part">
-      <span className="tag">PART 1 · 4–5 MINUTES</span><h4>Introduction and interview</h4><p>Answer the examiner’s questions about familiar topics. Aim for natural answers of two to four sentences.</p>
+      <span className="tag">PART 1 · 4–5 MINUTES</span><h4>Introduction and interview</h4><p>Answer the examiner’s questions about familiar topics. Aim for natural answers of two to four sentences. The section advances after its allotted time.</p><div className="prep-clock">{clock(stageRemaining)}<small>PART 1 TIME REMAINING</small></div>
       {questions.part1.map((group, i) => <article className="speaking-topic" key={group[0]}><b>{group[0]}</b>{group.slice(1).map((q, j) => <p key={j}>{i * 3 + j + 1}. {q}</p>)}</article>)}
       <button className="primary" type="button" disabled={!recording} onClick={() => { setPhase('prep'); setPrepSeconds(60); setPreparing(true); }}>Continue to Part 2 →</button>
     </section>}
@@ -149,11 +169,11 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
       <button className="primary" type="button" onClick={() => { setPreparing(false); setPhase('part2'); }}>Start speaking now →</button>
     </section>}
     {phase === 'part2' && <section className="speaking-part">
-      <span className="tag">PART 2 · 3–4 MINUTES</span><h4>Your long turn</h4><pre className="speaking-cue">{questions.cue}</pre><p>Speak for up to two minutes. When you are ready, continue to Part 3.</p>
+      <span className="tag">PART 2 · 3–4 MINUTES</span><h4>Your long turn</h4><pre className="speaking-cue">{questions.cue}</pre><p>Speak for up to two minutes. The interview will move to Part 3 when the time ends.</p><div className="prep-clock">{clock(stageRemaining)}<small>LONG TURN TIME REMAINING</small></div>
       <button className="primary" type="button" onClick={() => setPhase('part3')}>Continue to Part 3 →</button>
     </section>}
     {phase === 'part3' && <section className="speaking-part">
-      <span className="tag">PART 3 · 4–5 MINUTES</span><h4>Two-way discussion</h4><p>Give developed answers, explain your opinions and support them with reasons or examples.</p>
+      <span className="tag">PART 3 · 4–5 MINUTES</span><h4>Two-way discussion</h4><p>Give developed answers, explain your opinions and support them with reasons or examples. The interview ends when the discussion time expires.</p><div className="prep-clock">{clock(stageRemaining)}<small>PART 3 TIME REMAINING</small></div>
       {questions.part3.map((q, i) => <p className="speaking-question" key={i}>{i + 1}. {q}</p>)}
       <button className="primary" type="button" onClick={stopRecording}>Finish interview →</button>
     </section>}
