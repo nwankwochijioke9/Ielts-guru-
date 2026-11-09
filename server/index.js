@@ -99,9 +99,11 @@ app.post('/api/payments/initialize', requireLearner, async (req,res) => {
 app.post('/api/payments/verify', requireLearner, async (req,res) => {
  const txRef=String(req.body?.tx_ref||'');
  try { const result=await pool.query('SELECT tx_ref FROM payment_transactions WHERE tx_ref=$1 AND user_id=$2',[txRef,req.learner.id]); if(!result.rows[0]) return res.status(404).json({error:'Payment reference not found.'});
-  const response=await fetch('https://api.flutterwave.com/v3/transactions?tx_ref='+encodeURIComponent(txRef),{headers:{Authorization:'Bearer '+process.env.FLW_SECRET_KEY}}); const list=await response.json(); const item=list.data?.find(x=>x.tx_ref===txRef);
-  if(!response.ok || !item) return res.status(202).json({pending:true,message:'Payment is still being confirmed. Refresh your membership status shortly.'});
-  await activatePaidPlan(await verifyFlutterwaveTransaction(item.id,txRef)); res.json({success:true,subscription:await getActiveSubscription(req.learner.id)});
+  const response=await fetch('https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref='+encodeURIComponent(txRef),{headers:{Authorization:'Bearer '+process.env.FLW_SECRET_KEY}});
+  const result=await response.json();
+  if(!response.ok || result.status!=='success' || !result.data?.id) return res.status(202).json({pending:true,message:'Payment is still being confirmed. Refresh your membership status shortly.'});
+  if(result.data.status!=='successful' || result.data.tx_ref!==txRef) return res.status(400).json({error:'Flutterwave has not confirmed a successful payment.'});
+  await activatePaidPlan(await verifyFlutterwaveTransaction(result.data.id,txRef)); res.json({success:true,subscription:await getActiveSubscription(req.learner.id)});
  } catch(error) { res.status(400).json({error:error.message||'Unable to verify payment.'}); }
 });
 app.post('/api/payments/webhook', async (req,res) => {
