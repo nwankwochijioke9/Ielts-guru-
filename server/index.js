@@ -39,7 +39,7 @@ async function initDb() {
 }
 app.post('/api/auth/register', async (req,res) => {
   const email=String(req.body?.email||'').trim().toLowerCase(); const password=String(req.body?.password||'');
-  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length>254) return res.status(400).json({error:'Enter a valid email address.'});
+  if(!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email) || email.length>254) return res.status(400).json({error:'Enter a valid email address.'});
   if(password.length<10 || password.length>128) return res.status(400).json({error:'Use a password between 10 and 128 characters.'});
   if(!pool) return res.status(503).json({error:'Account creation is temporarily unavailable.'});
   try { const passwordHash=await hashPassword(password); const {rows}=await pool.query('INSERT INTO learners(email,password_hash) VALUES($1,$2) RETURNING id,email',[email,passwordHash]); const learner=rows[0]; const token=randomBytes(32).toString('base64url'); await pool.query('INSERT INTO learner_sessions(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+($3 * INTERVAL \'1 day\'))',[learner.id,hashToken(token),SESSION_DAYS]); setSessionCookie(res,token); const trial=await getTrial(learner.id); res.status(201).json({user:learner,trial:{active:trial.active,days_left:trial.days_left,expires_at:trial.expires_at,ai_reviews_used:trial.ai_reviews_used}}); }
