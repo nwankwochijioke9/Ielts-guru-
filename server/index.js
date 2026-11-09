@@ -30,20 +30,20 @@ app.get('/api/health', async (_req, res) => {
   catch { res.status(503).json({ ok: false, database: false }); }
 });
 app.get('/api/plans', async (_req, res) => {
-  if (!pool) return res.json([{ id: 0, name: 'Free Starter', price_ngn: 0, duration_days: 30, features: ['Sample practice','Basic progress tracking'] }]);
+  if (!pool) return res.json([{ id: 0, name: 'Free Starter', price_ngn: 0, price_usd: 0, duration_days: 5, features: ['5-day limited trial','Sample practice questions','One introductory AI writing review','Basic progress preview'] },{id:1,name:'Basic',price_ngn:5000,price_usd:4,duration_days:30,features:['Daily IELTS practice','Limited AI writing corrections','Academic and General Training practice','Basic progress tracking']},{id:2,name:'Standard',price_ngn:12000,price_usd:9,duration_days:30,features:['Everything in Basic','More AI writing assessments and corrections','Full Listening and Reading practice sets','Speaking practice and feedback','Timed skill tests']},{id:3,name:'Premium',price_ngn:25000,price_usd:19,duration_days:30,features:['Everything in Standard','Full IELTS mock-test access','Detailed AI writing feedback and model answers','Speaking transcript and assessment','Personalised improvement recommendations','Performance history and band tracking']},{id:4,name:'VIP',price_ngn:50000,price_usd:39,duration_days:30,features:['Everything in Premium','Highest AI assessment allowance','Advanced performance analytics','Personalised study plan','Priority access to new practice materials','Comprehensive progress reports']}]);
   try {
-    const { rows } = await pool.query('SELECT id,name,price_ngn,duration_days,features FROM plans WHERE active=true ORDER BY price_ngn');
+    const { rows } = await pool.query('SELECT id,name,price_ngn,price_usd,duration_days,features FROM plans WHERE active=true ORDER BY price_ngn');
     res.json(rows);
   } catch { res.status(500).json({ error: 'Unable to load plans.' }); }
 });
 app.put('/api/admin/plans/:id', async (req, res) => {
   if (!process.env.ADMIN_SECRET || req.get('x-admin-secret') !== process.env.ADMIN_SECRET) return res.status(401).json({ error: 'Admin authentication required.' });
-  const { name, price_ngn, duration_days, features, active } = req.body || {};
-  if (!name || !Number.isInteger(price_ngn) || price_ngn < 0 || !Number.isInteger(duration_days) || duration_days < 1 || !Array.isArray(features)) return res.status(400).json({ error: 'Invalid plan details.' });
+  const { name, price_ngn, price_usd = 0, duration_days, features, active } = req.body || {};
+  if (!name || !Number.isInteger(price_ngn) || price_ngn < 0 || !Number.isFinite(Number(price_usd)) || Number(price_usd) < 0 || !Number.isInteger(duration_days) || duration_days < 1 || !Array.isArray(features)) return res.status(400).json({ error: 'Invalid plan details.' });
   try {
     const { rows } = await pool.query(
-      'UPDATE plans SET name=$1,price_ngn=$2,duration_days=$3,features=$4,active=$5 WHERE id=$6 RETURNING id,name,price_ngn,duration_days,features,active',
-      [name, price_ngn, duration_days, JSON.stringify(features), active !== false, req.params.id]
+      'UPDATE plans SET name=$1,price_ngn=$2,price_usd=$3,duration_days=$4,features=$5,active=$6 WHERE id=$7 RETURNING id,name,price_ngn,price_usd,duration_days,features,active',
+      [name, price_ngn, Number(price_usd), duration_days, JSON.stringify(features), active !== false, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Plan not found.' });
     res.json(rows[0]);
