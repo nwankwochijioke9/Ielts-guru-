@@ -62,3 +62,6 @@ CREATE TABLE IF NOT EXISTS learner_sessions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS learner_sessions_expiry_idx ON learner_sessions(expires_at);
+
+DROP INDEX IF EXISTS free_trials_user_id_unique;
+CREATE UNIQUE INDEX IF NOT EXISTS free_trials_user_id_unique ON free_trials(user_id);
