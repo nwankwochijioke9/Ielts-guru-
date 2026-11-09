@@ -65,3 +65,11 @@ CREATE INDEX IF NOT EXISTS learner_sessions_expiry_idx ON learner_sessions(expir
 
 DROP INDEX IF EXISTS free_trials_user_id_unique;
 CREATE UNIQUE INDEX IF NOT EXISTS free_trials_user_id_unique ON free_trials(user_id);
+
+ALTER TABLE learners ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+ALTER TABLE learners ADD COLUMN IF NOT EXISTS email_verification_token_hash TEXT;
+ALTER TABLE learners ADD COLUMN IF NOT EXISTS email_verification_expires_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS learners_verification_token_idx ON learners(email_verification_token_hash);
+CREATE TABLE IF NOT EXISTS payment_transactions (id BIGSERIAL PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,plan_id INTEGER NOT NULL REFERENCES plans(id),tx_ref TEXT NOT NULL UNIQUE,amount NUMERIC(12,2) NOT NULL,currency TEXT NOT NULL DEFAULT 'NGN',status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','successful','failed')),provider_transaction_id TEXT,paid_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS subscriptions (id BIGSERIAL PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,plan_id INTEGER NOT NULL REFERENCES plans(id),payment_ref TEXT NOT NULL UNIQUE,starts_at TIMESTAMPTZ NOT NULL,ends_at TIMESTAMPTZ NOT NULL,status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','expired','cancelled')),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE INDEX IF NOT EXISTS subscriptions_user_status_idx ON subscriptions(user_id,status,ends_at);
