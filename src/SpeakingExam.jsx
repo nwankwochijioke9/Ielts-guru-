@@ -35,6 +35,9 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
   const [part1TopicIndex, setPart1TopicIndex] = useState(0);
   const [part1QuestionIndex, setPart1QuestionIndex] = useState(0);
   const [part3QuestionIndex, setPart3QuestionIndex] = useState(0);
+  const [examinerVoice, setExaminerVoice] = useState('coral');
+  const [audioStatus, setAudioStatus] = useState('');
+  const examinerAudioRef = useRef(null);
   const recorderRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
@@ -133,6 +136,63 @@ and explain why you remember this journey.`, part3: ['How has transport changed 
   }, []);
 
   const clock = n => `${Math.floor(n / 60).toString().padStart(2, '0')}:${(n % 60).toString().padStart(2, '0')}`;
+  async function playExaminer(spokenText) {
+    if (!spokenText) return;
+    try {
+      setAudioStatus('Preparing examiner voice…');
+      if (examinerAudioRef.current) {
+        examinerAudioRef.current.pause();
+        examinerAudioRef.current = null;
+      }
+      const response = await fetch('/api/speaking-examiner-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: spokenText, voice: examinerVoice })
+      });
+      if (!response.ok) throw new Error('Examiner audio is not available.');
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const player = new Audio(audioUrl);
+      examinerAudioRef.current = player;
+      player.onended = () => { URL.revokeObjectURL(audioUrl); setAudioStatus('Examiner prompt played'); };
+      player.onerror = () => { URL.revokeObjectURL(audioUrl); setAudioStatus(''); };
+      await player.play();
+      setAudioStatus('Examiner is speaking…');
+    } catch {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(spokenText);
+        utterance.lang = 'en-GB';
+        utterance.rate = 0.94;
+        const voices = window.speechSynthesis.getVoices();
+        const preferred = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
+        if (preferred) utterance.voice = preferred;
+        utterance.onend = () => setAudioStatus('Browser voice used');
+        window.speechSynthesis.speak(utterance);
+      } else setAudioStatus('Audio is unavailable on this device.');
+    }
+  }
+
+  const currentExaminerPrompt = phase === 'part1'
+    ? questions.part1[part1TopicIndex]?.[part1QuestionIndex + 1]
+    : phase === 'prep'
+      ? `Now I will give you a topic. You have one minute to prepare. You may make notes. Here is your topic. ${questions.cue.replace(/\\n/g, ' ')}`
+      : phase === 'part2'
+        ? 'Please begin speaking now. You have up to two minutes.'
+        : phase === 'part3'
+          ? `We have been talking about that topic. Now I would like to discuss some more general questions. ${questions.part3[part3QuestionIndex]}`
+          : '';
+
+  useEffect(() => {
+    if (['part1', 'prep', 'part2', 'part3'].includes(phase)) playExaminer(currentExaminerPrompt);
+    return () => {
+      if (examinerAudioRef.current) {
+        examinerAudioRef.current.pause();
+        examinerAudioRef.current = null;
+      }
+    };
+  }, [phase, part1TopicIndex, part1QuestionIndex, part3QuestionIndex, examinerVoice]);
+
 
   async function startRecording() {
     setError('');
@@ -207,11 +267,22 @@ and explain why you remember this journey.`, part3: ['How has transport changed 
     </div>
     {phase === 'intro' && <div className="speaking-start">
       <h4>Before you begin</h4>
+      <div className="examiner-voice-picker">
+        <label htmlFor="examiner-voice">Choose your examiner's voice</label>
+        <select id="examiner-voice" value={examinerVoice} onChange={event => setExaminerVoice(event.target.value)}>
+          <option value="coral">Coral · warm, clear voice</option>
+          <option value="alloy">Alloy · balanced voice</option>
+          <option value="echo">Echo · lower, measured voice</option>
+          <option value="shimmer">Shimmer · bright, clear voice</option>
+        </select>
+        <button type="button" onClick={() => playExaminer('Good morning. My name is your IELTS Speaking examiner. Could you tell me your full name, please?')}>▶ Preview examiner voice</button>
+        {audioStatus && <small>{audioStatus}</small>}
+      </div>
       <ul><li>Find a quiet place and allow microphone access.</li><li>Speak naturally and answer in complete sentences.</li><li>The examiner will move through questions one at a time. Keep recording throughout all three parts.</li><li>Your audio is submitted to the configured AI service for transcription and practice feedback after the interview.</li></ul>
       <button className="primary" type="button" onClick={startRecording}>Allow microphone & start interview →</button>
     </div>}
     {phase === 'part1' && <section className="speaking-part">
-      <span className="tag">PART 1 · 4–5 MINUTES</span><h4>Introduction and interview</h4><p>Answer the examiner’s questions about familiar topics. Aim for natural answers of two to four sentences. The section advances after its allotted time.</p><div className="prep-clock">{clock(stageRemaining)}<small>PART 1 TIME REMAINING</small></div>
+      <span className="tag">PART 1 · 4–5 MINUTES</span><h4>Introduction and interview</h4><p>Answer the examiner’s questions about familiar topics. Aim for natural answers of two to four sentences. The section advances after its allotted time.</p><div className="prep-clock">{clock(stageRemaining)}<small>PART 1 TIME REMAINING</small></div><p className="examiner-audio-note">Listen to the examiner’s spoken question, then answer aloud. <button type="button" onClick={() => playExaminer(currentExaminerPrompt)}>Replay question</button></p>
       <article className="speaking-topic">
         <b>Topic: {questions.part1[part1TopicIndex]?.[0]}</b>
         <p className="speaking-question">{questions.part1[part1TopicIndex]?.[part1QuestionIndex + 1]}</p>
@@ -226,15 +297,15 @@ and explain why you remember this journey.`, part3: ['How has transport changed 
     {phase === 'prep' && <section className="speaking-part">
       <span className="tag">PART 2 · PREPARATION</span><h4>Individual long turn</h4><p>You have one minute to prepare. You may make brief notes, then speak for up to two minutes.</p>
       <pre className="speaking-cue">{questions.cue}</pre>
-      <div className="prep-clock">{clock(prepSeconds)}<small>PREPARATION TIME</small></div>
+      <div className="prep-clock">{clock(prepSeconds)}<small>PREPARATION TIME</small></div><p className="examiner-audio-note">The examiner has read the cue card aloud. <button type="button" onClick={() => playExaminer(currentExaminerPrompt)}>Replay instructions</button></p>
       <button className="primary" type="button" onClick={() => { setPreparing(false); setPhase('part2'); }}>Start speaking now →</button>
     </section>}
     {phase === 'part2' && <section className="speaking-part">
-      <span className="tag">PART 2 · 3–4 MINUTES</span><h4>Your long turn</h4><pre className="speaking-cue">{questions.cue}</pre><p>Speak for up to two minutes. The interview will move to Part 3 when the time ends.</p><div className="prep-clock">{clock(stageRemaining)}<small>LONG TURN TIME REMAINING</small></div>
+      <span className="tag">PART 2 · 3–4 MINUTES</span><h4>Your long turn</h4><pre className="speaking-cue">{questions.cue}</pre><p>Speak for up to two minutes. The interview will move to Part 3 when the time ends.</p><div className="prep-clock">{clock(stageRemaining)}<small>LONG TURN TIME REMAINING</small></div><p className="examiner-audio-note"> <button type="button" onClick={() => playExaminer(currentExaminerPrompt)}>Replay examiner instruction</button></p>
       <button className="primary" type="button" onClick={() => setPhase('part3')}>Continue to Part 3 →</button>
     </section>}
     {phase === 'part3' && <section className="speaking-part">
-      <span className="tag">PART 3 · 4–5 MINUTES</span><h4>Two-way discussion</h4><p>Give developed answers, explain your opinions and support them with reasons or examples. The interview ends when the discussion time expires.</p><div className="prep-clock">{clock(stageRemaining)}<small>PART 3 TIME REMAINING</small></div>
+      <span className="tag">PART 3 · 4–5 MINUTES</span><h4>Two-way discussion</h4><p>Give developed answers, explain your opinions and support them with reasons or examples. The interview ends when the discussion time expires.</p><div className="prep-clock">{clock(stageRemaining)}<small>PART 3 TIME REMAINING</small></div><p className="examiner-audio-note">Listen to the follow-up question. <button type="button" onClick={() => playExaminer(currentExaminerPrompt)}>Replay question</button></p>
       <article className="speaking-topic">
         <b>Discussion question {part3QuestionIndex + 1} of {questions.part3.length}</b>
         <p className="speaking-question">{questions.part3[part3QuestionIndex]}</p>
