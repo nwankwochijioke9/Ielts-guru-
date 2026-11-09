@@ -198,3 +198,9 @@
 .writing-task-notes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0 18px}
 .writing-task-notes h4{margin:0;color:#264b47;font-size:12px}
 @media(max-width:600px){.writing-rubric,.writing-task-notes{grid-template-columns:1fr}.writing-task-scores article{padding:11px}}
+
+
+.speaking-topic small{display:block;margin-top:9px;color:#8a9690;font-size:10px;line-height:1.5}
+.speaking-topic .speaking-question{margin:12px 0;font:600 14px/1.7 Manrope;color:#294b45}
+.speaking-part>.primary{margin-top:14px}
+.speaking-cue{font-family:'DM Sans',sans-serif}
