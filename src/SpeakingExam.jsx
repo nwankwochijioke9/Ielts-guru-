@@ -176,7 +176,7 @@ and explain why you remember this journey.`, part3: ['How has transport changed 
   const currentExaminerPrompt = phase === 'part1'
     ? questions.part1[part1TopicIndex]?.[part1QuestionIndex + 1]
     : phase === 'prep'
-      ? `Now I will give you a topic. You have one minute to prepare. You may make notes. Here is your topic. ${questions.cue.replace(/\\n/g, ' ')}`
+      ? `Now I will give you a topic. You have one minute to prepare. You may make notes. Here is your topic. ${questions.cue.replace(/\n/g, ' ').replace(/•/g, ', ')}`
       : phase === 'part2'
         ? 'Please begin speaking now. You have up to two minutes.'
         : phase === 'part3'
