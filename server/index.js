@@ -50,12 +50,28 @@ async function sendVerificationEmail(email,token) {
 }
 app.post('/api/auth/register', async (req,res) => {
  const email=String(req.body?.email||'').trim().toLowerCase(); const password=String(req.body?.password||'');
- if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length>254) return res.status(400).json({error:'Enter a valid email address.'});
+ if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length>254) return res.status(400).json({error:'Enter a valid email address.'});
  if(password.length<10 || password.length>128) return res.status(400).json({error:'Use a password between 10 and 128 characters.'});
- if(!pool || !process.env.RESEND_API_KEY || !process.env.MAIL_FROM || !process.env.APP_URL) return res.status(503).json({error:'Account registration requires the database and email verification settings to be configured.'});
+ if(!pool) return res.status(503).json({error:'Registration is temporarily unavailable because the database is not connected. Please try again later.'});
  let learner;
- try { const passwordHash=await hashPassword(password); const result=await pool.query('INSERT INTO learners(email,password_hash) VALUES($1,$2) RETURNING id,email',[email,passwordHash]); learner=result.rows[0]; const token=randomBytes(32).toString('hex'); await pool.query("UPDATE learners SET email_verification_token_hash=$1,email_verification_expires_at=NOW()+INTERVAL '30 minutes' WHERE id=$2",[hashToken(token),learner.id]); await sendVerificationEmail(email,token); res.status(201).json({verification_required:true,message:'Check your email and click the verification link to activate your account and start your 3-day trial.'}); }
- catch(error) { if(learner) await pool.query('DELETE FROM learners WHERE id=$1',[learner.id]).catch(()=>{}); if(error?.code==='23505') return res.status(409).json({error:'An account with this email already exists. Please sign in or request a new verification email.'}); console.error('Registration failed:',error?.message||error); res.status(503).json({error:error?.message||'Unable to create your account. Please try again.'}); }
+ try {
+  const passwordHash=await hashPassword(password);
+  const result=await pool.query('INSERT INTO learners(email,password_hash) VALUES($1,$2) RETURNING id,email',[email,passwordHash]);
+  learner=result.rows[0];
+  const token=randomBytes(32).toString('hex');
+  await pool.query("UPDATE learners SET email_verification_token_hash=$1,email_verification_expires_at=NOW()+INTERVAL '30 minutes' WHERE id=$2",[hashToken(token),learner.id]);
+  try {
+   await sendVerificationEmail(email,token);
+   return res.status(201).json({verification_required:true,message:'Your account has been created. Check your inbox and spam folder for the verification link. It expires in 30 minutes.'});
+  } catch(mailError) {
+   console.error('Verification email delivery needs attention:',mailError?.message||mailError);
+   return res.status(202).json({verification_required:true,email_delivery_pending:true,message:'Your account has been created, but the verification email could not be delivered yet. You can request a new link below. If this keeps happening, the website administrator needs to check the email service settings.'});
+  }
+ } catch(error) {
+  if(error?.code==='23505') return res.status(409).json({error:'An account with this email already exists. Sign in or request a new verification email.'});
+  console.error('Registration failed:',error?.message||error);
+  return res.status(503).json({error:'We could not complete registration right now. Please try again shortly.'});
+ }
 });
 app.get('/api/auth/verify-email', async (req,res) => {
  const token=String(req.query.token||''); if(!/^[a-f0-9]{64}$/.test(token) || !pool) return res.status(400).send('This verification link is invalid.');
