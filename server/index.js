@@ -224,18 +224,43 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
   if (typeof script !== 'string' || !script.trim() || script.length > 10000) return res.status(400).json({ error: 'A valid listening script is required.' });
   if (!openai) return res.status(503).json({ error: 'Natural AI audio is not configured. Add OPENAI_API_KEY in Render environment settings.' });
   try {
-    const speech = await openai.audio.speech.create({
-      model: 'gpt-4o-mini-tts',
-      voice: 'coral',
-      input: script,
-      instructions: 'Speak clearly and naturally in a neutral British English accent, at a measured IELTS listening-test pace. Pronounce names, dates, addresses and numbers distinctly. Preserve pauses between sentences. Do not add or omit any words.'
-    });
-    const audio = Buffer.from(await speech.arrayBuffer());
-    res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': String(audio.length), 'Cache-Control': 'private, max-age=3600' });
-    res.send(audio);
+    const voiceBySpeaker = {
+      'Receptionist': 'coral', 'Caller': 'alloy',
+      'Tutor': 'echo', 'Student 1': 'nova', 'Student 2': 'shimmer'
+    };
+    const labels = ['Receptionist', 'Caller', 'Tutor', 'Student 1', 'Student 2'];
+    const matcher = new RegExp('(' + labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + '):', 'g');
+    const matches = [...script.matchAll(matcher)];
+    const segments = [];
+    if (matches.length) {
+      for (let i = 0; i < matches.length; i++) {
+        const label = matches[i][1];
+        const start = matches[i].index + matches[i][0].length;
+        const end = i + 1 < matches.length ? matches[i + 1].index : script.length;
+        const input = script.slice(start, end).trim();
+        if (input) segments.push({ speaker: label, voice: voiceBySpeaker[label], input });
+      }
+    } else {
+      const voice = script.includes('Welcome to Greenbank Park') ? 'coral' : 'echo';
+      segments.push({ speaker: 'Narrator', voice, input: script.trim() });
+    }
+    if (!segments.length || segments.length > 40) return res.status(400).json({ error: 'The listening script could not be divided into valid speaker turns.' });
+    const audioSegments = [];
+    for (const segment of segments) {
+      const speech = await openai.audio.speech.create({
+        model: 'gpt-4o-mini-tts',
+        voice: segment.voice,
+        input: segment.input,
+        instructions: 'You are one participant in a realistic IELTS Listening recording. Speak in natural British English with a distinct, consistent personal voice, realistic intonation and conversational pacing. This is a real conversation, not a single narrator reading a script. Keep your own speaking style distinct from the other speakers. Pronounce names, dates, addresses and numbers clearly. Speak only the supplied words; do not add commentary.'
+      });
+      const audio = Buffer.from(await speech.arrayBuffer());
+      audioSegments.push({ speaker: segment.speaker, audio: audio.toString('base64') });
+    }
+    res.set({ 'Cache-Control': 'private, max-age=3600' });
+    res.json({ segments: audioSegments });
   } catch (error) {
     console.error('Listening audio generation failed:', error?.message || error);
-    res.status(502).json({ error: 'Unable to generate listening audio right now.' });
+    res.status(502).json({ error: 'Unable to generate multi-speaker listening audio right now.' });
   }
 });
 const dist = path.resolve(__dirname, '../dist');
