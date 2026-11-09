@@ -21,7 +21,7 @@ const sets = {
   }
 };
 
-export default function SpeakingExam({ testType = 'academic' }) {
+export default function SpeakingExam({ testType = 'academic', testMode = 'practice' }) {
   const [phase, setPhase] = useState('intro');
   const [recording, setRecording] = useState(false);
   const [preparing, setPreparing] = useState(false);
@@ -128,7 +128,7 @@ export default function SpeakingExam({ testType = 'academic' }) {
 
   return <div className="speaking-exam">
     <div className="reading-head">
-      <div><span className="tag">{testType === 'academic' ? 'ACADEMIC' : 'GENERAL TRAINING'} SPEAKING</span><h3>Speaking interview · Parts 1–3</h3><p>11–14 minutes · Record one continuous interview, then receive AI-assisted feedback.</p></div>
+      <div><span className="tag">{testType === 'academic' ? 'ACADEMIC' : 'GENERAL TRAINING'} SPEAKING · {testMode === 'mock' ? 'MOCK TEST' : 'PRACTICE TEST'}</span><h3>{testMode === 'mock' ? 'Mock Speaking interview' : 'Speaking practice interview'} · Parts 1–3</h3><p>11–14 minutes · Record one continuous interview, then receive AI-assisted feedback.</p></div>
       <div className="reading-clock">{clock(seconds)}<small>{recording ? 'RECORDING TIME' : 'ELAPSED TIME'}</small></div>
     </div>
     {phase === 'intro' && <div className="speaking-start">
