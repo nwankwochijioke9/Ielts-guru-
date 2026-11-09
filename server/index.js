@@ -98,6 +98,26 @@ app.post('/api/assess-speaking', async (req, res) => {
     res.status(500).json({ error: 'Speaking assessment failed. Please try again.' });
   }
 });
+
+app.post('/api/listening-audio', async (req, res) => {
+  const { script } = req.body || {};
+  if (typeof script !== 'string' || !script.trim() || script.length > 10000) return res.status(400).json({ error: 'A valid listening script is required.' });
+  if (!openai) return res.status(503).json({ error: 'Natural AI audio is not configured. Add OPENAI_API_KEY in Render environment settings.' });
+  try {
+    const speech = await openai.audio.speech.create({
+      model: 'gpt-4o-mini-tts',
+      voice: 'coral',
+      input: script,
+      instructions: 'Speak clearly and naturally in a neutral British English accent, at a measured IELTS listening-test pace. Pronounce names, dates, addresses and numbers distinctly. Preserve pauses between sentences. Do not add or omit any words.'
+    });
+    const audio = Buffer.from(await speech.arrayBuffer());
+    res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': String(audio.length), 'Cache-Control': 'private, max-age=3600' });
+    res.send(audio);
+  } catch (error) {
+    console.error('Listening audio generation failed:', error?.message || error);
+    res.status(502).json({ error: 'Unable to generate listening audio right now.' });
+  }
+});
 const dist = path.resolve(__dirname, '../dist');
 app.use(express.static(dist));
 app.get('*', (_req, res) => res.sendFile(path.join(dist, 'index.html')));
