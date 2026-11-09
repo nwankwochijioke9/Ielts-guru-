@@ -1,4 +1,4 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 
 const parts=[
 {title:'PART 1 — Booking a community course',context:'A conversation between a caller and a community centre receptionist.',script:'Receptionist: Good morning, Westbridge Community Centre. How can I help? Caller: Hello. I would like to book a place on the evening cooking course. Receptionist: Certainly. The next course begins on Thursday the fourteenth of May and runs for six weeks. Caller: Is it every Thursday? Receptionist: Yes, from six thirty until eight thirty in the evening. The fee is eighty-four pounds, and that includes ingredients. Caller: Where is the centre? Receptionist: We are at 26 Market Street, opposite the post office. Caller: Do I need to bring anything? Receptionist: Just an apron. We provide all the equipment. Caller: I would like to register. My name is Daniel Morris. Receptionist: Could you spell Morris? Caller: M O R R I S. Receptionist: Thank you. And your contact number? Caller: 07942 618350. Receptionist: Great. There are still three places available. Please arrive ten minutes early on the first evening.'},
@@ -50,30 +50,46 @@ const questions=[
 ];
 const norm=s=>String(s||'').trim().toLowerCase().replace(/[.,]/g,'').replace(/\s+/g,' ');
 export default function ListeningExam({testType='academic',testMode='practice'}){
- const [answers,setAnswers]=useState({}),[activePart,setActivePart]=useState(0),[playing,setPlaying]=useState(false),[played,setPlayed]=useState({}),[result,setResult]=useState(null),[remaining,setRemaining]=useState(1800),[timerStarted,setTimerStarted]=useState(false);
+ const [answers,setAnswers]=useState({}),[activePart,setActivePart]=useState(0),[playing,setPlaying]=useState(false),[audioLoading,setAudioLoading]=useState(false),[played,setPlayed]=useState({}),[result,setResult]=useState(null),[remaining,setRemaining]=useState(1800),[timerStarted,setTimerStarted]=useState(false);\n const audioRef=useRef(null);
  const mock=testMode==='mock';
- useEffect(()=>()=>{if(typeof window!=='undefined'&&window.speechSynthesis)window.speechSynthesis.cancel();},[]);
+ useEffect(()=>()=>{if(typeof window!=='undefined'&&window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.src='';}},[]);
  useEffect(()=>{if(!mock||!timerStarted)return;const timer=setInterval(()=>setRemaining(v=>{if(v<=1){clearInterval(timer);setTimerStarted(false);if(window.speechSynthesis)window.speechSynthesis.cancel();setPlaying(false);return 0;}return v-1;}),1000);return()=>clearInterval(timer);},[mock,timerStarted]);
- const play=()=>{if(mock&&!timerStarted)setTimerStarted(true);
-  if(typeof window==='undefined'||!window.speechSynthesis){alert('Audio playback is not supported in this browser. Please use an up-to-date browser.');return;}
-  window.speechSynthesis.cancel();
-  const utterance=new SpeechSynthesisUtterance(parts[activePart].script);
-  utterance.rate=0.94;utterance.pitch=1;
-  utterance.onstart=()=>setPlaying(true);
-  utterance.onend=()=>{setPlaying(false);setPlayed(p=>({...p,[activePart]:true}));};
-  utterance.onerror=()=>setPlaying(false);
-  window.speechSynthesis.speak(utterance);
+ const play=async()=>{
+  if(mock&&!timerStarted)setTimerStarted(true);
+  setAudioLoading(true);
+  if(window.speechSynthesis)window.speechSynthesis.cancel();
+  if(audioRef.current){audioRef.current.pause();audioRef.current=null;}
+  try{
+   const response=await fetch('/api/listening-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script:parts[activePart].script})});
+   if(!response.ok)throw new Error('Natural audio is unavailable');
+   const blob=await response.blob();
+   const url=URL.createObjectURL(blob);
+   const audio=new Audio(url);
+   audioRef.current=audio;
+   audio.onended=()=>{setPlaying(false);setPlayed(p=>({...p,[activePart]:true}));URL.revokeObjectURL(url);};
+   audio.onerror=()=>{setPlaying(false);URL.revokeObjectURL(url);};
+   await audio.play();
+   setPlaying(true);
+  }catch{
+   if(typeof window==='undefined'||!window.speechSynthesis){setAudioLoading(false);alert('Audio playback is not supported in this browser.');return;}
+   const utterance=new SpeechSynthesisUtterance(parts[activePart].script);
+   utterance.rate=0.94;utterance.pitch=1;
+   utterance.onstart=()=>setPlaying(true);
+   utterance.onend=()=>{setPlaying(false);setPlayed(p=>({...p,[activePart]:true}));};
+   utterance.onerror=()=>setPlaying(false);
+   window.speechSynthesis.speak(utterance);
+  }finally{setAudioLoading(false);}
  };
- const stop=()=>{if(window.speechSynthesis)window.speechSynthesis.cancel();setPlaying(false);};
+ const stop=()=>{if(window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.currentTime=0;audioRef.current=null;}setPlaying(false);};
  const submit=()=>{stop();const score=questions.reduce((n,q)=>{const response=norm(answers[q[0]]);const expected=q[3]==='choice'?q[5]:q[4];const aliases=q[0]===16?['10:30','half past ten','half past 10']: [expected];return n+(aliases.some(v=>response===norm(v))?1:0);},0);setResult({score,answered:Object.values(answers).filter(v=>String(v||'').trim()).length});};
  return <div className="listening-exam">
   <div className="listening-top"><div><span className="tag">IELTS LISTENING · {testType==='academic'?'ACADEMIC':'GENERAL TRAINING'}</span><h3>Listening test · 40 questions</h3><p>4 parts · approximately 30 minutes · Questions follow the recording order.</p></div><div className="listening-progress">{mock?String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0'):Object.values(answers).filter(v=>String(v||'').trim()).length}<small>{mock?' time left':' / 40 answered'}</small></div></div>
-  <div className="listening-notice"><b>Audio format note:</b> This first version uses your browser’s speech voice to read the listening scripts aloud. It is useful for practice, but it is not a professionally recorded IELTS audio track and voice/accent may vary by device.</div>
+  <div className="listening-notice"><b>Audio format note:</b> The portal generates a natural British English voice track when AI audio is configured. If it is unavailable, your browser’s speech voice is used as a fallback. These are original practice scripts, not official IELTS recordings.</div>
   {mock&&remaining===0&&<p className="notice">The 30-minute test time has ended. Submit your answers to see your result.</p>}<div className="listening-part-tabs">{parts.map((p,i)=><button type="button" className={activePart===i?'active':''} key={p.title} onClick={()=>{stop();setActivePart(i);}}>{'Part '+(i+1)}</button>)}</div>
-  <div className="listening-player"><div><small>NOW PLAYING · PART {activePart+1}</small><h4>{parts[activePart].title}</h4><p>{parts[activePart].context}</p></div><div className="listening-controls"><button type="button" className="primary" onClick={play} disabled={playing||(mock&&(played[activePart]||remaining===0))}>{playing?'Playing…':played[activePart]?(mock?'Recording played':'Play again'):'▶ Play recording'}</button><button type="button" className="secondary" onClick={stop} disabled={!playing}>Stop</button></div>{mock&&played[activePart]&&<small className="played-note">Mock mode: this part has been played once.</small>}</div>
+  <div className="listening-player"><div><small>NOW PLAYING · PART {activePart+1}</small><h4>{parts[activePart].title}</h4><p>{parts[activePart].context}</p></div><div className="listening-controls"><button type="button" className="primary" onClick={play} disabled={playing||audioLoading||(mock&&(played[activePart]||remaining===0))}>{audioLoading?'Preparing audio…':playing?'Playing…':played[activePart]?(mock?'Recording played':'Play again'):'▶ Play recording'}</button><button type="button" className="secondary" onClick={stop} disabled={!playing}>Stop</button></div>{mock&&played[activePart]&&<small className="played-note">Mock mode: this part has been played once.</small>}</div>
   <div className="listening-questions"><h4>Part {activePart+1} questions</h4><p className="reading-instructions">Listen to the recording and answer the questions in this part. You can move between parts.</p>{questions.filter(q=>Math.ceil(q[0]/10)===activePart+1).map(q=><div className="listening-question" key={q[0]}><div><b>{q[0]}.</b> <span className="question-type">{q[1]}</span></div><p>{q[2]}</p>{q[3]==='choice'?<div className="reading-options">{q[3+1].map((v,i)=>{const k=String.fromCharCode(65+i);return <label key={k}><input type="radio" name={'listen'+q[0]} checked={answers[q[0]]===k} onChange={()=>setAnswers(a=>({...a,[q[0]]:k}))} disabled={mock&&remaining===0}/><span>{k}. {v}</span></label>;})}</div>:<input className="reading-short-answer" value={answers[q[0]]||''} onChange={e=>setAnswers(a=>({...a,[q[0]]:e.target.value}))} placeholder="Your answer" disabled={mock&&remaining===0}/>}</div>)}</div>
   <div className="listening-bottom"><button type="button" className="secondary" onClick={()=>{stop();setActivePart(Math.max(0,activePart-1));}} disabled={activePart===0}>← Previous part</button><button type="button" className="secondary" onClick={()=>{stop();setActivePart(Math.min(3,activePart+1));}} disabled={activePart===3}>Next part →</button><button type="button" className="primary" onClick={submit}>Submit Listening test →</button></div>
   {result&&<div className="reading-result"><h3>Your Listening practice result</h3><strong>{result.score} / 40</strong><p>{result.answered} questions answered. This is a raw practice score, not an official IELTS band. Check spelling and singular/plural forms carefully.</p><button type="button" className="primary" onClick={()=>{setAnswers({});setPlayed({});setActivePart(0);setResult(null);setRemaining(1800);setTimerStarted(false);}}>Retake test</button></div>}
-  <p className="reading-disclaimer">Original practice material using IELTS-style section order and question types. It is not an official IELTS paper. This prototype uses synthetic browser speech, does not yet reproduce the official audio quality, answer transfer time or all official question layouts. The same practice set is currently used for Academic and General Training.</p>
+  <p className="reading-disclaimer">Original practice material using IELTS-style section order and question types. It is not an official IELTS paper. Audio is AI-generated rather than an official recording. The prototype does not yet reproduce official answer-transfer time or every official question layout. Listening content is shared across Academic and General Training.</p>
  </div>;
 }
