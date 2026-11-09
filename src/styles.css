@@ -110,3 +110,23 @@
 .speaking-criteria strong{float:right;color:#bd784b}
 .speaking-criteria p{font-size:11px;line-height:1.6;color:#596a65}
 @media(max-width:760px){.speaking-exam{padding:16px}.speaking-criteria{grid-template-columns:1fr}.recording-status{align-items:flex-start}}
+
+
+.trial-access{max-width:1160px;margin:38px auto 20px;padding:28px 30px;display:grid;grid-template-columns:1fr minmax(280px,390px);gap:28px;align-items:center;background:#f1f4ef;border:1px solid #e2e9df;border-radius:14px}
+.trial-access-copy h2{font:700 27px Manrope;color:#1d4140;margin:10px 0}
+.trial-access-copy>p{max-width:520px;color:#687873;font-size:13px;line-height:1.7}
+.trial-status{display:flex;flex-direction:column;gap:5px;margin-top:18px;padding:13px 15px;border-left:3px solid #668b68;background:#fff;border-radius:5px;color:#1d4140}
+.trial-status strong{font:700 14px Manrope}.trial-status span{font-size:11px;color:#718079}.trial-status.expired{border-left-color:#bd784b}
+.account-card{display:grid;gap:10px;background:#fff;padding:19px;border:1px solid #e5e9e2;border-radius:10px}
+.account-card label{font-size:11px;font-weight:700;color:#415650}
+.account-card input{width:100%;min-width:0;padding:12px;border:1px solid #dfe6df;border-radius:6px;font:13px 'DM Sans';color:#1d4140;background:#fff}
+.account-card .primary{border:0;cursor:pointer;text-align:center;justify-content:center}
+.account-card .primary:disabled{opacity:.6;cursor:wait}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.auth-tabs button{border:1px solid #e3e9e2;border-radius:6px;padding:10px;background:#fff;color:#53645f;font:600 11px 'DM Sans';cursor:pointer}
+.auth-tabs button.active{background:#1d4140;color:#fff;border-color:#1d4140}
+.account-card>small{font-size:10px;line-height:1.6;color:#8a9690}
+.auth-notice{font-size:11px;line-height:1.5;color:#1d4140;background:#f1f4ef;padding:10px;border-radius:5px}
+.account-email{font-size:12px;color:#53645f;overflow-wrap:anywhere}
+.price-usd{font-size:12px;font-weight:700;color:#7a8982;margin-top:-8px;margin-bottom:12px}
+@media(max-width:760px){.trial-access{margin:25px 16px;padding:20px;grid-template-columns:1fr;gap:16px}.trial-access-copy h2{font-size:23px}}
