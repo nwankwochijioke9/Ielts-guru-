@@ -51,11 +51,12 @@ const questions=[
 const norm=s=>String(s||'').trim().toLowerCase().replace(/[.,]/g,'').replace(/\s+/g,' ');
 export default function ListeningExam({testType='academic',testMode='practice',onComplete}){
  const [answers,setAnswers]=useState({}),[activePart,setActivePart]=useState(0),[playing,setPlaying]=useState(false),[audioLoading,setAudioLoading]=useState(false),[played,setPlayed]=useState({}),[result,setResult]=useState(null),[remaining,setRemaining]=useState(1800),[timerStarted,setTimerStarted]=useState(false);
- const audioRef=useRef(null);
+ const audioRef=useRef(null),playbackToken=useRef(0);
  const mock=testMode==='mock';
- useEffect(()=>()=>{if(typeof window!=='undefined'&&window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.src='';}},[]);
+ useEffect(()=>()=>{playbackToken.current++;if(typeof window!=='undefined'&&window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.src='';}},[]);
  useEffect(()=>{if(!mock||!timerStarted)return;const timer=setInterval(()=>setRemaining(v=>{if(v<=1){clearInterval(timer);setTimerStarted(false);if(window.speechSynthesis)window.speechSynthesis.cancel();setPlaying(false);return 0;}return v-1;}),1000);return()=>clearInterval(timer);},[mock,timerStarted]);
  const play=async()=>{
+  const token=++playbackToken.current;
   if(mock&&!timerStarted)setTimerStarted(true);
   setAudioLoading(true);
   if(window.speechSynthesis)window.speechSynthesis.cancel();
@@ -67,17 +68,21 @@ export default function ListeningExam({testType='academic',testMode='practice',o
    if(!Array.isArray(payload.segments)||!payload.segments.length)throw new Error('Audio segments are unavailable');
    setPlaying(true);
    for(const segment of payload.segments){
+    if(token!==playbackToken.current)return;
     await new Promise((resolve,reject)=>{
      const audio=new Audio('data:audio/mpeg;base64,'+segment.audio);
      audioRef.current=audio;
      audio.onended=resolve;
+     audio.onpause=()=>{if(token!==playbackToken.current)resolve();};
      audio.onerror=()=>reject(new Error('A speaker recording could not be played'));
      audio.play().catch(reject);
     });
    }
+   if(token!==playbackToken.current)return;
    setPlaying(false);
    setPlayed(p=>({...p,[activePart]:true}));
   }catch{
+   if(token!==playbackToken.current)return;
    if(typeof window==='undefined'||!window.speechSynthesis){setAudioLoading(false);alert('Audio playback is not supported in this browser.');return;}
    const utterance=new SpeechSynthesisUtterance(parts[activePart].script);
    utterance.rate=0.94;utterance.pitch=1;
@@ -87,7 +92,7 @@ export default function ListeningExam({testType='academic',testMode='practice',o
    window.speechSynthesis.speak(utterance);
   }finally{setAudioLoading(false);}
  };
- const stop=()=>{if(window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.currentTime=0;audioRef.current=null;}setPlaying(false);};
+ const stop=()=>{playbackToken.current++;if(window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.currentTime=0;audioRef.current=null;}setPlaying(false);};
  const submit=()=>{stop();const score=questions.reduce((n,q)=>{const response=norm(answers[q[0]]);const expected=q[3]==='choice'?q[5]:q[4];const aliases={2:['14th of may','the fourteenth of may'],4:['£84','84 pounds'],9:['07942618350','07942-618350'],16:['10:30','half past ten','half past 10'],26:['weekend']};const accepted=[expected,...(aliases[q[0]]||[])];return n+(accepted.some(v=>response===norm(v))?1:0);},0);const answered=Object.values(answers).filter(v=>String(v||'').trim()).length;setResult({score,answered});onComplete?.({score,answered,total:40});};
  return <div className="listening-exam">
   <div className="listening-top"><div><span className="tag">IELTS LISTENING · {testType==='academic'?'ACADEMIC':'GENERAL TRAINING'}</span><h3>Listening test · 40 questions</h3><p>4 parts · approximately 30 minutes · 10 questions per part. In mock mode, complete each recording in order; each part can be played once.</p></div><div className="listening-progress">{mock?String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0'):Object.values(answers).filter(v=>String(v||'').trim()).length}<small>{mock?' time left':' / 40 answered'}</small></div></div>
