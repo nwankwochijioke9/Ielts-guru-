@@ -89,3 +89,24 @@
 .listening-question p{line-height:1.6;margin:8px 0}
 .listening-bottom{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;margin-top:20px}
 @media(max-width:760px){.listening-exam{padding:16px}.listening-top{flex-direction:column}.listening-player{align-items:flex-start}.listening-bottom{justify-content:flex-start}}
+
+.speaking-exam{background:#fff;border-radius:12px;padding:26px;box-shadow:0 12px 40px #1a383b0d;min-width:0}
+.speaking-start,.speaking-part{background:#f8f8f4;border:1px solid #e9ece6;border-radius:9px;padding:20px;margin-top:16px}
+.speaking-start h4,.speaking-part h4{font:700 17px Manrope;color:#1d4140;margin:10px 0}
+.speaking-start ul,.speaking-part p,.speaking-start li{font-size:12px;line-height:1.8;color:#53645f}
+.speaking-start ul{padding-left:20px;margin:10px 0 18px}
+.speaking-topic{border-top:1px solid #e7ebe4;padding:12px 0}
+.speaking-topic>b{font:700 12px Manrope;color:#1d4140}
+.speaking-topic p,.speaking-question{font-size:12px;line-height:1.7;color:#40554f;margin:7px 0}
+.speaking-cue{white-space:pre-wrap;background:#fff;border:1px solid #e6eae3;border-radius:8px;padding:17px;font:13px/1.8 'DM Sans';color:#334b45}
+.prep-clock{font:800 34px Manrope;color:#bd784b;margin:16px 0}
+.prep-clock small{display:block;font:700 9px 'DM Sans';letter-spacing:1px}
+.recording-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff4f1;border:1px solid #f0d7d0;border-radius:8px;padding:12px 14px;margin-top:14px;font-size:11px;color:#87483b}
+.recording-dot{width:9px;height:9px;border-radius:50%;background:#d45c4b;box-shadow:0 0 0 4px #f7ded8}
+.recording-status button{margin-left:auto;border:1px solid #d9aaa0;border-radius:5px;background:#fff;padding:7px 10px;color:#87483b;font:600 10px 'DM Sans'}
+.speaking-criteria{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.speaking-criteria article{background:#f8f8f4;border:1px solid #e9ece6;border-radius:7px;padding:12px}
+.speaking-criteria b{font:700 11px Manrope;color:#1d4140}
+.speaking-criteria strong{float:right;color:#bd784b}
+.speaking-criteria p{font-size:11px;line-height:1.6;color:#596a65}
+@media(max-width:760px){.speaking-exam{padding:16px}.speaking-criteria{grid-template-columns:1fr}.recording-status{align-items:flex-start}}
