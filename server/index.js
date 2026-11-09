@@ -2,7 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import pg from 'pg';
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +17,7 @@ const pool = process.env.DATABASE_URL ? new pg.Pool({
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '18mb' }));
 app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, limit: 100 }));
 
 async function initDb() {
@@ -66,6 +66,37 @@ app.post('/api/assess', async (req, res) => {
     if (pool) await pool.query('INSERT INTO practice_attempts(skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5)', [skill,prompt,response,feedback.estimated_band ?? null,JSON.stringify(feedback)]);
     res.json({ ...feedback, disclaimer: 'AI-generated practice estimate only; not an official IELTS score.' });
   } catch { res.status(500).json({ error: 'Assessment failed. Please try again.' }); }
+});
+
+app.post('/api/assess-speaking', async (req, res) => {
+  const { audio, mimeType, testType, durationSeconds } = req.body || {};
+  if (typeof audio !== 'string' || !audio || audio.length > 16 * 1024 * 1024 || !['audio/webm','audio/mp4','audio/ogg','audio/mpeg','audio/wav','audio/x-m4a'].includes(String(mimeType).split(';')[0]) || !['academic','general'].includes(testType)) {
+    return res.status(400).json({ error: 'Please submit a valid Speaking recording.' });
+  }
+  if (!openai) return res.status(503).json({ error: 'AI assessment is not configured. Add OPENAI_API_KEY in Render environment settings.' });
+  try {
+    const mime = String(mimeType).split(';')[0];
+    const extension = mime === 'audio/mp4' || mime === 'audio/x-m4a' ? 'm4a' : mime === 'audio/wav' ? 'wav' : mime === 'audio/ogg' ? 'ogg' : mime === 'audio/mpeg' ? 'mp3' : 'webm';
+    const bytes = Buffer.from(audio, 'base64');
+    if (!bytes.length || bytes.length > 12 * 1024 * 1024) return res.status(413).json({ error: 'Recording is too large. Please record a shorter interview.' });
+    const file = await toFile(bytes, `speaking.${extension}`, { type: mime });
+    const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1' });
+    const transcript = String(transcription.text || '').trim();
+    if (transcript.length < 40) return res.status(422).json({ error: 'The recording was too short or speech could not be transcribed clearly. Please try again in a quiet place.' });
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'You are an IELTS Speaking preparation tutor. Assess only what can responsibly be inferred from this transcript. Return JSON with summary (string), criteria (array of exactly four objects with name, band, feedback), strengths (array), improvements (array), transcript (string), estimated_band (null), and disclaimer (string). The four criterion names must be Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, and Pronunciation. Give cautious 0-9 half-band scores only for the first three transcript-assessable criteria. For Pronunciation set band to null and explicitly state that pronunciation cannot be reliably assessed from a text transcript. Do not invent pauses, hesitation, accent, intonation or sound quality. Do not provide an overall estimated band because the audio has only been transcribed and the four criteria cannot all be assessed. Give useful, specific feedback and make clear this is not an official IELTS score.' },
+        { role: 'user', content: JSON.stringify({ testType, durationSeconds, transcript }) }
+      ]
+    });
+    const feedback = JSON.parse(completion.choices[0].message.content || '{}');
+    res.json({ ...feedback, transcript, estimated_band: null, disclaimer: 'AI-generated transcript-based practice feedback only. Pronunciation and an overall IELTS Speaking band cannot be reliably assessed from this transcript. This is not an official IELTS score.' });
+  } catch (error) {
+    console.error('Speaking assessment failed:', error?.message || error);
+    res.status(500).json({ error: 'Speaking assessment failed. Please try again.' });
+  }
 });
 const dist = path.resolve(__dirname, '../dist');
 app.use(express.static(dist));
