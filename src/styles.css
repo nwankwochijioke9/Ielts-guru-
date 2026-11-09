@@ -144,3 +144,12 @@
 .premium-feature-notice h3{font:700 22px Manrope;color:#1d4140;margin:10px 0}
 .premium-feature-notice p{font-size:12px;line-height:1.8;color:#687873;margin-bottom:20px}
 .premium-feature-notice .primary{display:inline-flex;text-decoration:none}
+
+.admin-panel{background:#fff;border:1px solid #e7e9ee;border-radius:18px;padding:24px;max-width:760px}
+.admin-panel label{display:grid;gap:8px;margin:12px 0;font-weight:600}
+.admin-panel input,.admin-panel select,.admin-panel textarea{width:100%;padding:12px;border:1px solid #d9dee8;border-radius:9px;font:inherit}
+.admin-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.admin-active{display:flex!important;align-items:center;gap:10px}.admin-active input{width:auto}
+.admin-plan-form{margin-top:18px}
+.plan-link:disabled{opacity:.6;cursor:wait}
+@media(max-width:640px){.admin-fields{grid-template-columns:1fr}}
