@@ -37,3 +37,14 @@ An independent IELTS preparation website built with React, Vite, Express and Pos
 - Flutterwave checkout and signed webhook verification.
 - Admin dashboard UI for creating/editing packages and reviewing learners.
 - Automated tests, production monitoring and security review.
+
+
+## Required production environment variables
+- `RESEND_API_KEY`: Resend API key for account verification email.
+- `MAIL_FROM`: sender address on a domain verified with Resend.
+- `APP_URL`: public website origin, for example `https://ielts-guru.onrender.com`.
+- `FLW_SECRET_KEY`: Flutterwave secret key (use test credentials before going live).
+- `FLW_WEBHOOK_HASH`: webhook secret hash configured in the Flutterwave dashboard.
+- `ADMIN_SECRET`: long random secret for administrator plan management.
+
+Flutterwave webhook URL: `https://ielts-guru.onrender.com/api/payments/webhook`. Set its webhook secret hash to the same value as `FLW_WEBHOOK_HASH`. Checkout currently charges in NGN. Membership activation requires server-side transaction verification.
