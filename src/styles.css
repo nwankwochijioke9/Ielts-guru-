@@ -153,3 +153,5 @@
 .admin-plan-form{margin-top:18px}
 .plan-link:disabled{opacity:.6;cursor:wait}
 @media(max-width:640px){.admin-fields{grid-template-columns:1fr}}
+
+.trial-benefits{margin-top:18px;padding:18px 20px;background:#f7f1e9;border:1px solid #ead9c9;border-radius:9px;max-width:540px}.trial-benefits>strong{display:block;color:#1d4140;font:700 14px Manrope;margin-bottom:8px}.trial-benefits ul{margin:0 0 12px;padding-left:18px;color:#667773;font-size:11px;line-height:1.8}.trial-benefits a{color:#b87549;font-size:11px;font-weight:700;text-decoration:none}.trial-benefits a:hover{text-decoration:underline}
