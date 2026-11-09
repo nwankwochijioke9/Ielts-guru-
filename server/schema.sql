@@ -22,9 +22,9 @@ SELECT 'Free Starter', 0, 30, '["Sample practice","Basic progress tracking"]'::j
 WHERE NOT EXISTS (SELECT 1 FROM plans WHERE name = 'Free Starter');
 ALTER TABLE plans ADD COLUMN IF NOT EXISTS price_usd NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (price_usd >= 0);
 INSERT INTO plans (name, price_ngn, price_usd, duration_days, features)
-SELECT seed.name, seed.price_ngn, seed.price_usd, 30, seed.features::jsonb
+SELECT seed.name, seed.price_ngn, seed.price_usd, CASE WHEN seed.name='Free Starter' THEN 3 ELSE 30 END, seed.features::jsonb
 FROM (VALUES
- ('Free Starter',0,0,'["5-day limited trial","Sample practice questions","One introductory AI writing review","Basic progress preview"]'),
+ ('Free Starter',0,0,'["3-day limited trial","Sample practice questions","One introductory AI writing review","Basic progress preview"]'),
  ('Basic',5000,4,'["Daily IELTS practice","Limited AI writing corrections","Academic and General Training practice","Basic progress tracking"]'),
  ('Standard',12000,9,'["Everything in Basic","More AI writing assessments and corrections","Full Listening and Reading practice sets","Speaking practice and feedback","Timed skill tests"]'),
  ('Premium',25000,19,'["Everything in Standard","Full IELTS mock-test access","Detailed AI writing feedback and model answers","Speaking transcript and assessment","Personalised improvement recommendations","Performance history and band tracking"]'),
@@ -35,6 +35,13 @@ WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name=seed.name);
 CREATE TABLE IF NOT EXISTS free_trials (
   trial_id TEXT PRIMARY KEY,
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '5 days'),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '3 days'),
   ai_reviews_used INTEGER NOT NULL DEFAULT 0 CHECK (ai_reviews_used >= 0)
 );
+
+UPDATE plans
+SET duration_days=3,
+    features='["3-day limited trial","Sample practice questions","One introductory AI writing review","Basic progress preview"]'::jsonb
+WHERE name='Free Starter';
+ALTER TABLE free_trials ALTER COLUMN expires_at
+SET DEFAULT (NOW() + INTERVAL '3 days');
