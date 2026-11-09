@@ -6,6 +6,8 @@ import OpenAI, { toFile } from 'openai';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomBytes, createHash, timingSafeEqual, scrypt as scryptCallback } from 'node:crypto';
+import { promisify } from 'node:util';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -15,6 +17,16 @@ const pool = process.env.DATABASE_URL ? new pg.Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 }) : null;
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const scrypt = promisify(scryptCallback);
+const SESSION_DAYS = 30;
+const cookieName = 'ielts_guru_session';
+const hashToken = token => createHash('sha256').update(token).digest('hex');
+async function hashPassword(password) { const salt=randomBytes(16).toString('hex'); const key=await scrypt(password,salt,64); return `${salt}:${Buffer.from(key).toString('hex')}`; }
+async function verifyPassword(password, stored) { try { const [salt,hex]=stored.split(':'); const expected=Buffer.from(hex,'hex'); const actual=Buffer.from(await scrypt(password,salt,64)); return expected.length===actual.length && timingSafeEqual(expected,actual); } catch { return false; } }
+function readCookie(req,name) { const part=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(`${name}=`)); return part ? decodeURIComponent(part.slice(name.length+1)) : ''; }
+function setSessionCookie(res,token) { res.cookie(cookieName,token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge:SESSION_DAYS*24*60*60*1000}); }
+async function requireLearner(req,res,next) { try { if(!pool) return res.status(503).json({error:'Account services require the database to be configured.'}); const token=readCookie(req,cookieName); if(!token) return res.status(401).json({error:'Please create an account or sign in to continue.'}); const {rows}=await pool.query('SELECT l.id,l.email FROM learner_sessions s JOIN learners l ON l.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(token)]); if(!rows[0]) return res.status(401).json({error:'Your session has expired. Please sign in again.'}); req.learner=rows[0]; next(); } catch { res.status(500).json({error:'Unable to verify your account.'}); } }
+async function getTrial(userId) { await pool.query('INSERT INTO free_trials(trial_id,user_id) VALUES($1,$1) ON CONFLICT(user_id) DO NOTHING',[String(userId)]); const {rows}=await pool.query('SELECT started_at,expires_at,ai_reviews_used,(expires_at>NOW()) AS active, GREATEST(0,CEIL(EXTRACT(EPOCH FROM (expires_at-NOW()))/86400))::int AS days_left FROM free_trials WHERE user_id=$1',[userId]); return rows[0]; }
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: '18mb' }));
@@ -25,6 +37,23 @@ async function initDb() {
   const sql = await fs.readFile(path.join(__dirname, 'schema.sql'), 'utf8');
   await pool.query(sql);
 }
+app.post('/api/auth/register', async (req,res) => {
+  const email=String(req.body?.email||'').trim().toLowerCase(); const password=String(req.body?.password||'');
+  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length>254) return res.status(400).json({error:'Enter a valid email address.'});
+  if(password.length<10 || password.length>128) return res.status(400).json({error:'Use a password between 10 and 128 characters.'});
+  if(!pool) return res.status(503).json({error:'Account creation is temporarily unavailable.'});
+  try { const passwordHash=await hashPassword(password); const {rows}=await pool.query('INSERT INTO learners(email,password_hash) VALUES($1,$2) RETURNING id,email',[email,passwordHash]); const learner=rows[0]; const token=randomBytes(32).toString('base64url'); await pool.query('INSERT INTO learner_sessions(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+($3 * INTERVAL \'1 day\'))',[learner.id,hashToken(token),SESSION_DAYS]); setSessionCookie(res,token); const trial=await getTrial(learner.id); res.status(201).json({user:learner,trial:{active:trial.active,days_left:trial.days_left,expires_at:trial.expires_at,ai_reviews_used:trial.ai_reviews_used}}); }
+  catch(error) { if(error?.code==='23505') return res.status(409).json({error:'An account with this email already exists. Please sign in.'}); console.error('Registration failed:',error?.message||error); res.status(500).json({error:'Unable to create your account. Please try again.'}); }
+});
+app.post('/api/auth/login', async (req,res) => {
+  const email=String(req.body?.email||'').trim().toLowerCase(); const password=String(req.body?.password||'');
+  if(!pool) return res.status(503).json({error:'Sign-in is temporarily unavailable.'});
+  try { const {rows}=await pool.query('SELECT id,email,password_hash FROM learners WHERE email=$1',[email]); if(!rows[0] || !(await verifyPassword(password,rows[0].password_hash))) return res.status(401).json({error:'Email or password is incorrect.'}); const learner={id:rows[0].id,email:rows[0].email}; const token=randomBytes(32).toString('base64url'); await pool.query('INSERT INTO learner_sessions(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+($3 * INTERVAL \'1 day\'))',[learner.id,hashToken(token),SESSION_DAYS]); setSessionCookie(res,token); const trial=await getTrial(learner.id); res.json({user:learner,trial:{active:trial.active,days_left:trial.days_left,expires_at:trial.expires_at,ai_reviews_used:trial.ai_reviews_used}}); }
+  catch(error) { console.error('Login failed:',error?.message||error); res.status(500).json({error:'Unable to sign in. Please try again.'}); }
+});
+app.get('/api/auth/me', requireLearner, async (req,res) => { const trial=await getTrial(req.learner.id); res.json({user:req.learner,trial:{active:trial.active,days_left:trial.days_left,expires_at:trial.expires_at,ai_reviews_used:trial.ai_reviews_used}}); });
+app.post('/api/auth/logout', async (req,res) => { const token=readCookie(req,cookieName); if(token && pool) await pool.query('DELETE FROM learner_sessions WHERE token_hash=$1',[hashToken(token)]).catch(()=>{}); res.clearCookie(cookieName,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/'}); res.json({ok:true}); });
+app.get('/api/trial/status', requireLearner, async (req,res) => { const trial=await getTrial(req.learner.id); res.json({active:trial.active,days_left:trial.days_left,expires_at:trial.expires_at,ai_reviews_used:trial.ai_reviews_used,ai_reviews_remaining:Math.max(0,1-trial.ai_reviews_used)}); });
 app.get('/api/health', async (_req, res) => {
   try { if (pool) await pool.query('SELECT 1'); res.json({ ok: true, database: !!pool }); }
   catch { res.status(503).json({ ok: false, database: false }); }
@@ -49,9 +78,13 @@ app.put('/api/admin/plans/:id', async (req, res) => {
     res.json(rows[0]);
   } catch { res.status(500).json({ error: 'Unable to update plan.' }); }
 });
-app.post('/api/assess', async (req, res) => {
+app.post('/api/assess', requireLearner, async (req, res) => {
   const { skill, prompt, response } = req.body || {};
   if (!['writing','speaking','reading','listening'].includes(skill) || typeof prompt !== 'string' || typeof response !== 'string' || !response.trim() || response.length > 12000) return res.status(400).json({ error: 'Please provide a valid skill, task and answer (maximum 12,000 characters).' });
+  const trial = await getTrial(req.learner.id);
+  if (!trial.active) return res.status(403).json({ error: 'Your 3-day free trial has ended. Choose a membership plan to continue with AI marking.', code: 'TRIAL_EXPIRED' });
+  if (skill !== 'writing') return res.status(403).json({ error: 'The free trial includes one introductory AI Writing review. Subscribe to unlock AI feedback for all four skills.', code: 'UPGRADE_REQUIRED' });
+  if (trial.ai_reviews_used >= 1) return res.status(403).json({ error: 'You have used your free AI Writing review. Subscribe to unlock unlimited practice feedback.', code: 'TRIAL_LIMIT_REACHED' });
   if (!openai) return res.status(503).json({ error: 'AI marking is not configured yet. Add OPENAI_API_KEY in Render environment settings.' });
   try {
     const completion = await openai.chat.completions.create({
@@ -63,16 +96,20 @@ app.post('/api/assess', async (req, res) => {
       ]
     });
     const feedback = JSON.parse(completion.choices[0].message.content || '{}');
-    if (pool) await pool.query('INSERT INTO practice_attempts(skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5)', [skill,prompt,response,feedback.estimated_band ?? null,JSON.stringify(feedback)]);
+    await pool.query('INSERT INTO practice_attempts(skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5)', [skill,prompt,response,feedback.estimated_band ?? null,JSON.stringify(feedback)]);
+    await pool.query('UPDATE free_trials SET ai_reviews_used=ai_reviews_used+1 WHERE user_id=$1',[req.learner.id]);
     res.json({ ...feedback, disclaimer: 'AI-generated practice estimate only; not an official IELTS score.' });
   } catch { res.status(500).json({ error: 'Assessment failed. Please try again.' }); }
 });
 
-app.post('/api/assess-speaking', async (req, res) => {
+app.post('/api/assess-speaking', requireLearner, async (req, res) => {
   const { audio, mimeType, testType, durationSeconds } = req.body || {};
   if (typeof audio !== 'string' || !audio || audio.length > 16 * 1024 * 1024 || !['audio/webm','audio/mp4','audio/ogg','audio/mpeg','audio/wav','audio/x-m4a'].includes(String(mimeType).split(';')[0]) || !['academic','general'].includes(testType)) {
     return res.status(400).json({ error: 'Please submit a valid Speaking recording.' });
   }
+  const trial = await getTrial(req.learner.id);
+  if (!trial.active) return res.status(403).json({ error: 'Your 3-day free trial has ended. Subscribe to unlock Speaking assessments.', code: 'TRIAL_EXPIRED' });
+  return res.status(403).json({ error: 'AI Speaking assessment is included in paid memberships. Your free trial includes one introductory Writing review.', code: 'UPGRADE_REQUIRED' });
   if (!openai) return res.status(503).json({ error: 'AI assessment is not configured. Add OPENAI_API_KEY in Render environment settings.' });
   try {
     const mime = String(mimeType).split(';')[0];
