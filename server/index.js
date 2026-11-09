@@ -196,7 +196,7 @@ app.post('/api/speaking-examiner-audio', requireLearner, async (req, res) => {
   const trial = await getTrial(req.learner.id);
   if (!trial.active && !(await getActiveSubscription(req.learner.id))) return res.status(403).json({ error: 'Your 3-day trial has ended. Subscribe to continue practising.' });
   const { text: spokenText, voice } = req.body || {};
-  const allowedVoices = ['alloy', 'echo', 'nova', 'shimmer'];
+  const allowedVoices = ['alloy', 'coral', 'echo', 'nova', 'shimmer'];
   if (typeof spokenText !== 'string' || !spokenText.trim() || spokenText.length > 2500 || !allowedVoices.includes(voice)) {
     return res.status(400).json({ error: 'A valid examiner prompt and voice are required.' });
   }
