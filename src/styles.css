@@ -138,3 +138,9 @@
 .trial-locked ul{padding-left:20px;margin:18px 0 24px}
 .trial-locked li{font-size:12px;line-height:1.9;color:#53645f}
 .trial-locked .primary{display:inline-flex;text-decoration:none}
+
+
+.premium-feature-notice{grid-column:1/-1;max-width:650px;margin:auto;padding:30px;background:#f8f8f4;border:1px solid #e5e9e2;border-radius:10px}
+.premium-feature-notice h3{font:700 22px Manrope;color:#1d4140;margin:10px 0}
+.premium-feature-notice p{font-size:12px;line-height:1.8;color:#687873;margin-bottom:20px}
+.premium-feature-notice .primary{display:inline-flex;text-decoration:none}
