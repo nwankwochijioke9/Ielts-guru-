@@ -45,3 +45,20 @@ SET duration_days=3,
 WHERE name='Free Starter';
 ALTER TABLE free_trials ALTER COLUMN expires_at
 SET DEFAULT (NOW() + INTERVAL '3 days');
+
+CREATE TABLE IF NOT EXISTS learners (
+  id BIGSERIAL PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE free_trials ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES learners(id);
+CREATE UNIQUE INDEX IF NOT EXISTS free_trials_user_id_unique ON free_trials(user_id) WHERE user_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS learner_sessions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS learner_sessions_expiry_idx ON learner_sessions(expires_at);
