@@ -49,7 +49,7 @@ const questions=[
 [40,'Sentence completion','Ecological recovery may take many ______.','text','years']
 ];
 const norm=s=>String(s||'').trim().toLowerCase().replace(/[.,]/g,'').replace(/\s+/g,' ');
-export default function ListeningExam({testType='academic',testMode='practice'}){
+export default function ListeningExam({testType='academic',testMode='practice',onComplete}){
  const [answers,setAnswers]=useState({}),[activePart,setActivePart]=useState(0),[playing,setPlaying]=useState(false),[audioLoading,setAudioLoading]=useState(false),[played,setPlayed]=useState({}),[result,setResult]=useState(null),[remaining,setRemaining]=useState(1800),[timerStarted,setTimerStarted]=useState(false);
  const audioRef=useRef(null);
  const mock=testMode==='mock';
@@ -82,7 +82,7 @@ export default function ListeningExam({testType='academic',testMode='practice'})
   }finally{setAudioLoading(false);}
  };
  const stop=()=>{if(window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.currentTime=0;audioRef.current=null;}setPlaying(false);};
- const submit=()=>{stop();const score=questions.reduce((n,q)=>{const response=norm(answers[q[0]]);const expected=q[3]==='choice'?q[5]:q[4];const aliases=q[0]===16?['10:30','half past ten','half past 10']: [expected];return n+(aliases.some(v=>response===norm(v))?1:0);},0);setResult({score,answered:Object.values(answers).filter(v=>String(v||'').trim()).length});};
+ const submit=()=>{stop();const score=questions.reduce((n,q)=>{const response=norm(answers[q[0]]);const expected=q[3]==='choice'?q[5]:q[4];const aliases=q[0]===16?['10:30','half past ten','half past 10']: [expected];return n+(aliases.some(v=>response===norm(v))?1:0);},0);setResult({score,answered:Object.values(answers).filter(v=>String(v||'').trim()).length});onComplete?.();};
  return <div className="listening-exam">
   <div className="listening-top"><div><span className="tag">IELTS LISTENING · {testType==='academic'?'ACADEMIC':'GENERAL TRAINING'}</span><h3>Listening test · 40 questions</h3><p>4 parts · approximately 30 minutes · Questions follow the recording order.</p></div><div className="listening-progress">{mock?String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0'):Object.values(answers).filter(v=>String(v||'').trim()).length}<small>{mock?' time left':' / 40 answered'}</small></div></div>
   <div className="listening-notice"><b>Audio format note:</b> The portal generates a natural British English voice track when AI audio is configured. If it is unavailable, your browser’s speech voice is used as a fallback. These are original practice scripts, not official IELTS recordings.</div>
