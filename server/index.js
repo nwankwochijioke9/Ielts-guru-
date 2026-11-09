@@ -192,6 +192,31 @@ app.post('/api/assess-speaking', requireLearner, async (req, res) => {
   }
 });
 
+app.post('/api/speaking-examiner-audio', requireLearner, async (req, res) => {
+  const trial = await getTrial(req.learner.id);
+  if (!trial.active && !(await getActiveSubscription(req.learner.id))) return res.status(403).json({ error: 'Your 3-day trial has ended. Subscribe to continue practising.' });
+  const { text: spokenText, voice } = req.body || {};
+  const allowedVoices = ['alloy', 'echo', 'nova', 'shimmer'];
+  if (typeof spokenText !== 'string' || !spokenText.trim() || spokenText.length > 2500 || !allowedVoices.includes(voice)) {
+    return res.status(400).json({ error: 'A valid examiner prompt and voice are required.' });
+  }
+  if (!openai) return res.status(503).json({ error: 'Natural examiner audio is not configured. Add OPENAI_API_KEY in Render environment settings.' });
+  try {
+    const speech = await openai.audio.speech.create({
+      model: 'gpt-4o-mini-tts',
+      voice,
+      input: spokenText,
+      instructions: 'You are a professional IELTS Speaking examiner conducting a calm, natural face-to-face interview. Speak in clear, natural British English with realistic human-like intonation, varied sentence rhythm and warm but neutral examiner delivery. Ask the question exactly as written. Do not sound like a navigation system, do not add commentary, and do not read bullet symbols aloud.'
+    });
+    const audio = Buffer.from(await speech.arrayBuffer());
+    res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': String(audio.length), 'Cache-Control': 'private, max-age=3600' });
+    res.send(audio);
+  } catch (error) {
+    console.error('Speaking examiner audio failed:', error?.message || error);
+    res.status(502).json({ error: 'Unable to generate examiner audio right now.' });
+  }
+});
+
 app.post('/api/listening-audio', requireLearner, async (req, res) => {
   const trial = await getTrial(req.learner.id);
   if (!trial.active && !(await getActiveSubscription(req.learner.id))) return res.status(403).json({ error: 'Your 3-day trial has ended. Subscribe to continue practising.' });
