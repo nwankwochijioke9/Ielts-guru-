@@ -115,7 +115,7 @@ app.get('/api/health', async (_req, res) => {
 app.get('/api/plans', async (_req, res) => {
   if (!pool) return res.json([{ id: 0, name: 'Free Starter', price_ngn: 0, price_usd: 0, duration_days: 3, features: ['3-day limited trial','Sample practice questions','One introductory AI writing review','Basic progress preview'] },{id:1,name:'Basic',price_ngn:5000,price_usd:4,duration_days:30,features:['Daily IELTS practice','Limited AI writing corrections','Academic and General Training practice','Basic progress tracking']},{id:2,name:'Standard',price_ngn:12000,price_usd:9,duration_days:30,features:['Everything in Basic','More AI writing assessments and corrections','Full Listening and Reading practice sets','Speaking practice and feedback','Timed skill tests']},{id:3,name:'Premium',price_ngn:25000,price_usd:19,duration_days:30,features:['Everything in Standard','Full IELTS mock-test access','Detailed AI writing feedback and model answers','Speaking transcript and assessment','Personalised improvement recommendations','Performance history and band tracking']},{id:4,name:'VIP',price_ngn:50000,price_usd:39,duration_days:30,features:['Everything in Premium','Highest AI assessment allowance','Advanced performance analytics','Personalised study plan','Priority access to new practice materials','Comprehensive progress reports']}]);
   try {
-    const { rows } = await pool.query('SELECT id,name,price_ngn,price_usd,duration_days,features FROM plans WHERE active=true ORDER BY price_ngn');
+    const { rows } = await pool.query('SELECT id,name,price_ngn,price_usd,duration_days,features,active FROM plans WHERE active=true ORDER BY price_ngn');
     res.json(rows);
   } catch { res.status(500).json({ error: 'Unable to load plans.' }); }
 });
