@@ -39,7 +39,17 @@ An independent IELTS preparation website built with React, Vite, Express and Pos
 ## Required production environment variables
 - `RESEND_API_KEY`: Resend API key for account verification email.
 - `MAIL_FROM`: sender address on a domain verified with Resend.
-- `APP_URL`: public website origin, for example `https://ielts-guru.onrender.com`.
+- `APP_URL`: public website origin, exactly `https://ielts-guru.onrender.com` for the current site (no trailing slash).
+
+### Set up email verification with Resend
+1. Create/sign in to a Resend account and add a domain you control.
+2. Add the DNS records Resend provides to your domain provider, then wait until Resend marks the domain as verified. A sender address on an unverified domain will be rejected.
+3. Create a Resend API key and add it to Render as `RESEND_API_KEY`.
+4. Set `MAIL_FROM` to a sender on that verified domain, for example `IELTS Guru <no-reply@mail.yourdomain.com>`; replace the example with your own verified domain.
+5. Set `APP_URL` to `https://ielts-guru.onrender.com` (no trailing slash), then save the environment changes and redeploy the web service.
+6. Test registration with an email address you can access. Check Inbox and Spam. Verification links expire after 30 minutes; use **Resend verification email** to request another link.
+
+Registration now keeps a newly created account in an unverified state if email delivery is temporarily unavailable, instead of deleting the account. Learners still cannot sign in or start the trial until they verify their email. This avoids weakening account security; the administrator must still configure a working verified sender before verification emails can be delivered.
 - `FLW_SECRET_KEY`: Flutterwave secret key (use test credentials before going live).
 - `FLW_WEBHOOK_HASH`: webhook secret hash configured in the Flutterwave dashboard.
 - `ADMIN_SECRET`: long random secret for administrator plan management.
