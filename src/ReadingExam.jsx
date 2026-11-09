@@ -97,12 +97,12 @@ const generalQuestions=[
 [40,'Sentence completion','Repair café success depends on volunteers and suitable ______.','text',[],'equipment']
 ];
 
-export default function ReadingExam({testType='academic',testMode='practice',onClose}){
+export default function ReadingExam({testType='academic',testMode='practice',onClose,onComplete}){
  const [remaining,setRemaining]=useState(3600),[started,setStarted]=useState(false),[answers,setAnswers]=useState({}),[result,setResult]=useState(null);
  useEffect(()=>{if(!started)return;const t=setInterval(()=>setRemaining(v=>{if(v<=1){clearInterval(t);setStarted(false);return 0;}return v-1;}),1000);return()=>clearInterval(t);},[started]);
  const questionSet=testType==='academic'?questions:generalQuestions;
  const set=(n,v)=>setAnswers(a=>({...a,[n]:v}));
- const submit=()=>{const score=questionSet.reduce((s,q)=>s+(String(answers[q[0]]||'').trim().toLowerCase()===q[5].toLowerCase()?1:0),0);setResult({score,count:Object.values(answers).filter(x=>String(x).trim()).length});setStarted(false);};
+ const submit=()=>{const score=questionSet.reduce((s,q)=>s+(String(answers[q[0]]||'').trim().toLowerCase()===q[5].toLowerCase()?1:0),0);setResult({score,count:Object.values(answers).filter(x=>String(x).trim()).length});setStarted(false);onComplete?.();};
  return <div className="reading-exam">
   <div className="reading-head"><div><span className="tag">{testType==='academic'?'ACADEMIC READING':'GENERAL TRAINING READING'} · {testMode==='mock'?'MOCK TEST':'PRACTICE TEST'}</span><h3>{testMode==='mock'?'Timed Reading mock test':'Reading practice test'} · 40 questions</h3><p>60 minutes · Complete all three passages or sections. Questions are numbered in test order. Your answers are marked automatically against this practice set’s answer key.</p></div><div className="reading-clock">{String(Math.floor(remaining/60)).padStart(2,'0')}:{String(remaining%60).padStart(2,'0')}<small>TIME REMAINING</small></div></div>
   {!started&&!result&&<div className="reading-start"><p>{testMode==='mock'?'Mock-test conditions: start the 60-minute clock, answer all 40 questions and submit before time expires.':'Practise all 40 questions at your own pace; start the clock whenever you are ready.'}</p><button className="primary" type="button" onClick={()=>setStarted(true)}>{testMode==='mock'?'Start timed mock test →':'Start Reading practice →'}</button></div>}
