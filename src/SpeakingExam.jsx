@@ -21,7 +21,7 @@ const sets = {
   }
 };
 
-export default function SpeakingExam({ testType = 'academic', testMode = 'practice' }) {
+export default function SpeakingExam({ testType = 'academic', testMode = 'practice', onComplete }) {
   const [phase, setPhase] = useState('intro');
   const [recording, setRecording] = useState(false);
   const [preparing, setPreparing] = useState(false);
@@ -119,6 +119,7 @@ export default function SpeakingExam({ testType = 'academic', testMode = 'practi
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Speaking assessment is unavailable.');
       setFeedback(data);
+      onComplete?.();
     } catch (err) {
       setError(err.message || 'Unable to submit your recording. Please try again.');
     } finally {
