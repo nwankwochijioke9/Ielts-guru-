@@ -89,12 +89,7 @@ export default function ListeningExam({testType='academic',testMode='practice',o
    // in one uninterrupted narrator voice.
    const script=parts[activePart].script;
    const speakerLabels=['Receptionist','Caller','Tutor','Student 1','Student 2'];
-   const matcher=new RegExp('('+speakerLabels.map(label=>label.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\   const utterance=new SpeechSynthesisUtterance(parts[activePart].script);
-   utterance.rate=0.94;utterance.pitch=1;
-   utterance.onstart=()=>setPlaying(true);
-   utterance.onend=()=>{setPlaying(false);setPlayed(p=>({...p,[activePart]:true}));};
-   utterance.onerror=()=>setPlaying(false);
-   window.speechSynthesis.speak(utterance);')).join('|')+'):', 'g');
+   const matcher=new RegExp('('+speakerLabels.join('|')+'):', 'g');
    const matches=[...script.matchAll(matcher)];
    const turns=matches.length?matches.map((match,index)=>({
     speaker:match[1],
