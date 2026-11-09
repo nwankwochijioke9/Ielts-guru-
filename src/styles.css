@@ -130,3 +130,11 @@
 .account-email{font-size:12px;color:#53645f;overflow-wrap:anywhere}
 .price-usd{font-size:12px;font-weight:700;color:#7a8982;margin-top:-8px;margin-bottom:12px}
 @media(max-width:760px){.trial-access{margin:25px 16px;padding:20px;grid-template-columns:1fr;gap:16px}.trial-access-copy h2{font-size:23px}}
+
+
+.trial-locked{grid-column:1/-1;max-width:680px;margin:auto;padding:32px;background:#f8f8f4;border:1px solid #e5e9e2;border-radius:10px;color:#1d4140}
+.trial-locked h3{font:700 24px Manrope;margin:10px 0}
+.trial-locked p{font-size:13px;line-height:1.7;color:#687873}
+.trial-locked ul{padding-left:20px;margin:18px 0 24px}
+.trial-locked li{font-size:12px;line-height:1.9;color:#53645f}
+.trial-locked .primary{display:inline-flex;text-decoration:none}
