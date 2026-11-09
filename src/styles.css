@@ -155,3 +155,6 @@
 @media(max-width:640px){.admin-fields{grid-template-columns:1fr}}
 
 .trial-benefits{margin-top:18px;padding:18px 20px;background:#f7f1e9;border:1px solid #ead9c9;border-radius:9px;max-width:540px}.trial-benefits>strong{display:block;color:#1d4140;font:700 14px Manrope;margin-bottom:8px}.trial-benefits ul{margin:0 0 12px;padding-left:18px;color:#667773;font-size:11px;line-height:1.8}.trial-benefits a{color:#b87549;font-size:11px;font-weight:700;text-decoration:none}.trial-benefits a:hover{text-decoration:underline}
+
+
+.mock-progress{grid-column:1/-1;padding:16px 18px;background:#ffffff12;border:1px solid #ffffff20;border-radius:8px}.mock-progress>strong{display:block;color:#fff;font:700 13px Manrope;margin-bottom:10px}.mock-progress-track{height:7px;background:#ffffff25;border-radius:10px;overflow:hidden}.mock-progress-track i{display:block;height:100%;background:#e7b58f;border-radius:10px;transition:width .25s}.mock-progress-list{display:flex;flex-wrap:wrap;gap:8px 16px;margin:12px 0;color:#d6e0dc;font-size:10px;text-transform:capitalize}.mock-progress-list .done{color:#b8e0bf}.mock-progress .primary{margin-top:4px;border:0;cursor:pointer}.mock-progress .primary:disabled{opacity:.7;cursor:default}
