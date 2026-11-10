@@ -243,7 +243,7 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
     // Rotate the voice cast for every recording instead of assigning the same
     // fixed voice to a role in every test. Speakers within one recording always
     // receive different voices; the same script keeps a stable cast on replay.
-    const voicePool = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer', 'verse', 'marin', 'cedar'];
+    const voicePool = ['alloy', 'coral', 'echo', 'nova', 'shimmer'];
     let scriptHash = 2166136261;
     for (let i = 0; i < script.length; i++) {
       scriptHash ^= script.charCodeAt(i);
