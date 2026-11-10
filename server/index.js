@@ -243,7 +243,7 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
     // Rotate the voice cast for every recording instead of assigning the same
     // fixed voice to a role in every test. Speakers within one recording always
     // receive different voices; the same script keeps a stable cast on replay.
-    const voicePool = ['alloy', 'coral', 'echo', 'nova', 'shimmer'];
+    const voicePool = ['coral', 'onyx', 'nova', 'echo', 'shimmer', 'ash', 'ballad', 'fable', 'sage', 'verse', 'marin', 'cedar', 'alloy'];
     const accentPool = ['British English', 'Australian English', 'New Zealand English', 'North American English', 'Irish English'];
     let scriptHash = 2166136261;
     for (let i = 0; i < script.length; i++) {
@@ -292,7 +292,7 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
       }));
       audioSegments.push(...batch);
     }
-    res.set({ 'Cache-Control': 'private, max-age=3600' });
+    res.set({ 'Cache-Control': 'private, no-store' });
     res.json({ segments: audioSegments });
   } catch (error) {
     console.error('Listening audio generation failed:', error?.message || error);
