@@ -10,6 +10,7 @@ const parts=[
    if(!Array.isArray(payload.segments)||!payload.segments.length)throw new Error('Audio segments are unavailable');
    setPlaying(true);
    let previousSpeaker=null;
+   let previousSpeaker=null;
    for(const segment of payload.segments){
     if(token!==playbackToken.current)return;
     if(previousSpeaker&&previousSpeaker!==segment.speaker){
@@ -38,96 +39,22 @@ const parts=[
  };
  const stop=()=>{playbackToken.current++;if(window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.currentTime=0;audioRef.current=null;}setPlaying(false);};
  useEffect(()=>{if(mock&&remaining===0){stop();}},[mock,remaining]);
- const submit=()=>{stop();const score=questions.reduce((n,q)=>{const response=norm(answers[q[0]]);const expected=q[3]==='choice'?q[5]:q[4];
-const questions=[
-[1,'Form completion','Course name','text','cooking course'],
-[2,'Form completion','First class day','text','Thursday'],
-[3,'Form completion','Course duration (number of weeks)','text','6'],
-[4,'Form completion','Course fee (in pounds)','text','84'],
-[5,'Form completion','Centre address: 26 ______ Street','text','Market'],
-[6,'Form completion','Item the caller must bring','text','apron'],
-[7,'Form completion','Caller’s first name','text','Daniel'],
-[8,'Form completion','Caller’s surname','text','Morris'],
-[9,'Form completion','Contact number','text','07942 618350'],
-[10,'Form completion','Number of places still available','text','3'],
-[11,'Map / plan labelling','What is located at point A on the plan?','choice',['Main entrance','Bicycle entrance','Café','Playground','Museum'],'A'],
-[12,'Map / plan labelling','What is located at point B on the plan?','choice',['Main entrance','Bicycle entrance','Café','Playground','Museum'],'B'],
-[13,'Map / plan labelling','What is located at point C on the plan?','choice',['Main entrance','Bicycle entrance','Café','Playground','Museum'],'C'],
-[14,'Map / plan labelling','What is located at point D on the plan?','choice',['Main entrance','Bicycle entrance','Café','Playground','Museum'],'D'],
-[15,'Map / plan labelling','What is located at point E on the plan?','choice',['Main entrance','Bicycle entrance','Café','Playground','Museum'],'E'],
-[16,'Note completion','The guided walk begins at ______.','text','10:30'],
-[17,'Multiple choice','What is the maximum size of a guided walk group?','choice',['10','15','20'],'B'],
-[18,'Multiple choice','When is the rose garden expected to reopen?','choice',['May','June','July'],'C'],
-[19,'Multiple choice','What must visitors do if they bring a dog?','choice',['Keep it on a lead','Carry it near the lake','Keep it outside the park'],'A'],
-[20,'Multiple choice','Which place is located near the lake?','choice',['The café','The museum','The playground'],'A'],
-[21,'Multiple choice','How did the students collect most of their responses?','choice',['By telephone','Online','At the station'],'B'],
-[22,'Multiple choice','What was the main reason people chose the bus?','choice',['Cost','Journey time','Comfort'],'A'],
-[23,'Matching','Younger respondents were more concerned about…','choice',['reliability','convenience','ticket design'],'B'],
-[24,'Matching','Older respondents were more concerned about…','choice',['reliability','convenience','ticket design'],'A'],
-[25,'Sentence completion','The students received fewer responses than they had ______.','text','expected'],
-[26,'Sentence completion','They should compare travel on weekdays and ______.','text','weekends'],
-[27,'Multiple choice','What should be included to show age differences?','choice',['A chart','A map','A photograph'],'A'],
-[28,'Multiple choice','Where should limitations appear in the report?','choice',['After recommendations','Before recommendations','In the title'],'B'],
-[29,'Multiple choice','What is the tutor’s main advice about the sample?','choice',['Claim it represents everyone','Explain that it was relatively small','Remove the questionnaire'],'B'],
-[30,'Sentence completion','Journey time came ______ in the results.','text','second'],
-[31,'Note completion','Wetlands form where land is regularly covered by shallow ______.','text','water'],
-[32,'Note completion','Wetland roots help hold ______ in place.','text','soil'],
-[33,'Multiple choice','What can wetlands store in their soils?','choice',['Carbon','Plastic','Salt'],'A'],
-[34,'Multiple choice','Which activity can damage wetlands?','choice',['Urban development','Bird watching','Guided walks'],'A'],
-[35,'Sentence completion','Restoration may begin by removing barriers to natural ______.','text','tides'],
-[36,'Multiple choice','What do scientists monitor after restoration begins?','choice',['Water quality and plant growth','Road traffic','Tourist spending'],'A'],
-[37,'Multiple choice','Why is measuring restored land area alone insufficient?','choice',['Biodiversity also matters','It is too expensive','It cannot be mapped'],'A'],
-[38,'Sentence completion','Native species should ______ to the restored wetland.','text','return'],
-[39,'Multiple choice','How can local communities contribute?','choice',['Report wildlife changes','Change tidal patterns','Build new roads'],'A'],
-[40,'Sentence completion','Ecological recovery may take many ______.','text','years']
-];
-const norm=s=>String(s||'').trim().toLowerCase().replace(/[.,]/g,'').replace(/\s+/g,' ');
-const listeningBand=score=>{
- const bands=[[39,40,9],[37,38,8.5],[35,36,8],[32,34,7.5],[30,31,7],[26,29,6.5],[23,25,6],[18,22,5.5],[16,17,5],[13,15,4.5],[10,12,4],[8,9,3.5],[6,7,3],[4,5,2.5],[0,3,2]];
- return bands.find(([low,high])=>score>=low&&score<=high)?.[2]??0;
-};
-export default function ListeningExam({testType='academic',testMode='practice',onComplete}){
- const [answers,setAnswers]=useState({}),[activePart,setActivePart]=useState(0),[playing,setPlaying]=useState(false),[audioLoading,setAudioLoading]=useState(false),[played,setPlayed]=useState({}),[result,setResult]=useState(null),[remaining,setRemaining]=useState(1920),[timerStarted,setTimerStarted]=useState(false);
- const audioRef=useRef(null),playbackToken=useRef(0);
- const mock=testMode==='mock';
- useEffect(()=>()=>{playbackToken.current++;if(typeof window!=='undefined'&&window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.src='';}},[]);
- useEffect(()=>{if(!mock||!timerStarted)return;const timer=setInterval(()=>setRemaining(v=>{if(v<=1){clearInterval(timer);setTimerStarted(false);return 0;}return v-1;}),1000);return()=>clearInterval(timer);},[mock,timerStarted]);
- const play=async()=>{
-  const token=++playbackToken.current;
-  if(mock&&!timerStarted)setTimerStarted(true);
-  setAudioLoading(true);
-  if(window.speechSynthesis)window.speechSynthesis.cancel();
-  if(audioRef.current){audioRef.current.pause();audioRef.current=null;}
-  try{
-   const response=await fetch('/api/listening-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script:parts[activePart].script})});
-   if(!response.ok)throw new Error('Natural audio is unavailable');
-   const payload=await response.json();
-   if(!Array.isArray(payload.segments)||!payload.segments.length)throw new Error('Audio segments are unavailable');
-   setPlaying(true);
-   for(const segment of payload.segments){
-    if(token!==playbackToken.current)return;
-    await new Promise((resolve,reject)=>{
-     const audio=new Audio('data:audio/mpeg;base64,'+segment.audio);
-     audioRef.current=audio;
-     audio.onended=resolve;
-     audio.onpause=()=>{if(token!==playbackToken.current)resolve();};
-     audio.onerror=()=>reject(new Error('A speaker recording could not be played'));
-     audio.play().catch(reject);
-    });
-   }
-   if(token!==playbackToken.current)return;
-   setPlaying(false);
-   setPlayed(p=>({...p,[activePart]:true}));
-  }catch(error){
-   if(token!==playbackToken.current)return;
-   setPlaying(false);
-   if(audioRef.current){audioRef.current.pause();audioRef.current=null;}
-   alert('The IELTS-style AI recording could not be generated or played. Please try again later. A browser voice will not be substituted.');
-  }finally{setAudioLoading(false);}
+ const submit=()=>{
+  stop();
+  const aliases={2:['14th of may','the fourteenth of may'],4:['£84','84 pounds'],9:['07942618350','07942-618350'],16:['half past ten','half past 10'],26:['weekend']};
+  const review=questions.map(q=>{
+   const response=norm(answers[q[0]]);
+   const expected=q[3]==='choice'?q[5]:q[4];
+   const accepted=[expected,...(aliases[q[0]]||[])].map(norm);
+   const expectedAnswer=q[3]==='choice'?expected+'. '+q[4][expected.charCodeAt(0)-65]:expected;
+   return {number:q[0],prompt:q[2],response:answers[q[0]]||'',expectedAnswer,correct:accepted.includes(response)};
+  });
+  const score=review.filter(item=>item.correct).length;
+  const answered=review.filter(item=>String(item.response).trim()).length;
+  const band=listeningBand(score);
+  setResult({score,answered,band,review});
+  onComplete?.({score,answered,total:40,band});
  };
- const stop=()=>{playbackToken.current++;if(window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.currentTime=0;audioRef.current=null;}setPlaying(false);};
- useEffect(()=>{if(mock&&remaining===0){stop();}},[mock,remaining]);
- const submit=()=>{stop();const score=questions.reduce((n,q)=>{const response=norm(answers[q[0]]);const expected=q[3]==='choice'?q[5]:q[4];const aliases={2:['14th of may','the fourteenth of may'],4:['£84','84 pounds'],9:['07942618350','07942-618350'],16:['10:30','half past ten','half past 10'],26:['weekend']};const accepted=[expected,...(aliases[q[0]]||[])];return n+(accepted.some(v=>response===norm(v))?1:0);},0);const answered=Object.values(answers).filter(v=>String(v||'').trim()).length;setResult({score,answered});onComplete?.({score,answered,total:40});};
  return <div className="listening-exam">
   <div className="listening-top"><div><span className="tag">IELTS LISTENING · {testType==='academic'?'ACADEMIC':'GENERAL TRAINING'}</span><h3>Listening test · 40 questions</h3><p>4 parts · 40 questions · about 30 minutes of audio. Mock mode allows one play per part and a short final checking period.</p></div><div className="listening-progress">{mock?String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0'):Object.values(answers).filter(v=>String(v||'').trim()).length}<small>{mock?' time left':' / 40 answered'}</small></div></div>
   <div className="listening-notice"><b>Audio format note:</b> Conversations use distinct AI voices for each speaker, while talks and lectures use a single presenter. If AI audio is unavailable, playback stops rather than substituting a different browser voice. These are original practice scripts, not official IELTS recordings.</div>
