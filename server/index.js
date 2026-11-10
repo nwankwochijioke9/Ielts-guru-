@@ -31,7 +31,13 @@ async function getTrial(userId) { await pool.query('INSERT INTO free_trials(tria
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: '18mb' }));
-app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, limit: 100 }));
+app.use('/api', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  // Render polls this endpoint for service health; it must not consume or hit
+  // the learner-facing API rate limit, even when checks are frequent.
+  skip: (req) => req.path === '/health'
+}));
 
 async function initDb() {
   if (!pool) return;
@@ -243,7 +249,7 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
     // Rotate the voice cast for every recording instead of assigning the same
     // fixed voice to a role in every test. Speakers within one recording always
     // receive different voices; the same script keeps a stable cast on replay.
-    const voicePool = ['alloy', 'coral', 'echo', 'nova', 'shimmer'];
+    const voicePool = ['coral', 'onyx', 'nova', 'echo', 'shimmer', 'ash', 'ballad', 'fable', 'sage', 'verse', 'marin', 'cedar', 'alloy'];
     const accentPool = ['British English', 'Australian English', 'New Zealand English', 'North American English', 'Irish English'];
     let scriptHash = 2166136261;
     for (let i = 0; i < script.length; i++) {
@@ -274,19 +280,25 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
       const voice = voicePool[castOffset];
       segments.push({ speaker: 'Narrator', voice, accent: accentPool[castOffset], input: script.trim() });
     }
-    if (!segments.length || segments.length > 40) return res.status(400).json({ error: 'The listening script could not be divided into valid speaker turns.' });
+    if (!segments.length || segments.length > 80) return res.status(400).json({ error: 'The listening script could not be divided into valid speaker turns.' });
     const audioSegments = [];
-    for (const segment of segments) {
-      const speech = await openai.audio.speech.create({
-        model: 'gpt-4o-mini-tts',
-        voice: segment.voice,
-        input: segment.input,
-        instructions: 'You are one participant in a realistic IELTS Listening recording. Speak in natural ' + segment.accent + ' with a distinct, consistent personal voice, realistic intonation and conversational pacing. This is a real conversation, not a single narrator reading a script. Keep your own speaking style distinct from the other speakers. Pronounce names, dates, addresses and numbers clearly. Speak only the supplied words; do not add commentary.'
-      });
-      const audio = Buffer.from(await speech.arrayBuffer());
-      audioSegments.push({ speaker: segment.speaker, audio: audio.toString('base64') });
+    // Generate a small batch concurrently to keep full-length recordings within
+    // normal web-request limits while retaining the original speaker order.
+    for (let offset = 0; offset < segments.length; offset += 4) {
+      const batch = await Promise.all(segments.slice(offset, offset + 4).map(async (segment) => {
+        const speech = await openai.audio.speech.create({
+          model: 'gpt-4o-mini-tts',
+          voice: segment.voice,
+          input: segment.input,
+          speed: 0.92,
+          instructions: 'You are one participant in a realistic IELTS Listening recording. Speak in natural ' + segment.accent + ' with a distinct, consistent personal voice, realistic intonation and measured exam-style pacing. This is a real conversation, not a single narrator reading a script. Keep your own speaking style distinct from the other speakers. Pronounce names, dates, addresses and numbers clearly. Speak only the supplied words; do not add commentary.'
+        });
+        const audio = Buffer.from(await speech.arrayBuffer());
+        return { speaker: segment.speaker, audio: audio.toString('base64') };
+      }));
+      audioSegments.push(...batch);
     }
-    res.set({ 'Cache-Control': 'private, max-age=3600' });
+    res.set({ 'Cache-Control': 'private, no-store' });
     res.json({ segments: audioSegments });
   } catch (error) {
     console.error('Listening audio generation failed:', error?.message || error);
