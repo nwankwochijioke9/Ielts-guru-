@@ -91,7 +91,7 @@ export default function ListeningExam({testType='academic',testMode='practice',o
   if(audioRef.current){audioRef.current.pause();audioRef.current=null;}
   try{
    const response=await fetch('/api/listening-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script:parts[activePart].script})});
-   if(!response.ok)throw new Error('The natural AI recording is currently unavailable.');
+   if(!response.ok){let detail='';try{const failure=await response.json();detail=typeof failure?.error==='string'?failure.error:'';}catch{}throw new Error(detail||'The natural AI recording is currently unavailable.');}
    const payload=await response.json();
    if(!Array.isArray(payload.segments)||!payload.segments.length)throw new Error('No audio segments were returned.');
    if(token!==playbackToken.current)return;
