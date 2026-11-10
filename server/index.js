@@ -274,17 +274,22 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
       const voice = voicePool[castOffset];
       segments.push({ speaker: 'Narrator', voice, accent: accentPool[castOffset], input: script.trim() });
     }
-    if (!segments.length || segments.length > 40) return res.status(400).json({ error: 'The listening script could not be divided into valid speaker turns.' });
+    if (!segments.length || segments.length > 80) return res.status(400).json({ error: 'The listening script could not be divided into valid speaker turns.' });
     const audioSegments = [];
-    for (const segment of segments) {
-      const speech = await openai.audio.speech.create({
-        model: 'gpt-4o-mini-tts',
-        voice: segment.voice,
-        input: segment.input,
-        instructions: 'You are one participant in a realistic IELTS Listening recording. Speak in natural ' + segment.accent + ' with a distinct, consistent personal voice, realistic intonation and conversational pacing. This is a real conversation, not a single narrator reading a script. Keep your own speaking style distinct from the other speakers. Pronounce names, dates, addresses and numbers clearly. Speak only the supplied words; do not add commentary.'
-      });
-      const audio = Buffer.from(await speech.arrayBuffer());
-      audioSegments.push({ speaker: segment.speaker, audio: audio.toString('base64') });
+    // Generate a small batch concurrently to keep full-length recordings within
+    // normal web-request limits while retaining the original speaker order.
+    for (let offset = 0; offset < segments.length; offset += 4) {
+      const batch = await Promise.all(segments.slice(offset, offset + 4).map(async (segment) => {
+        const speech = await openai.audio.speech.create({
+          model: 'gpt-4o-mini-tts',
+          voice: segment.voice,
+          input: segment.input,
+          instructions: 'You are one participant in a realistic IELTS Listening recording. Speak in natural ' + segment.accent + ' with a distinct, consistent personal voice, realistic intonation and measured exam-style pacing. This is a real conversation, not a single narrator reading a script. Keep your own speaking style distinct from the other speakers. Pronounce names, dates, addresses and numbers clearly. Speak only the supplied words; do not add commentary.'
+        });
+        const audio = Buffer.from(await speech.arrayBuffer());
+        return { speaker: segment.speaker, audio: audio.toString('base64') };
+      }));
+      audioSegments.push(...batch);
     }
     res.set({ 'Cache-Control': 'private, max-age=3600' });
     res.json({ segments: audioSegments });
