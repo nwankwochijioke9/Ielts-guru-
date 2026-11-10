@@ -23,38 +23,11 @@ const parts=[
    if(token!==playbackToken.current)return;
    setPlaying(false);
    setPlayed(p=>({...p,[activePart]:true}));
-  }catch{
+  }catch(error){
    if(token!==playbackToken.current)return;
-   if(typeof window==='undefined'||!window.speechSynthesis){setAudioLoading(false);alert('Audio playback is not supported in this browser.');return;}
-   // Keep the browser fallback conversational too: split labelled dialogue into turns
-   // and alternate available British English voices instead of reading the whole script
-   // in one uninterrupted narrator voice.
-   const script=parts[activePart].script;
-   const speakerLabels=['Receptionist','Caller','Tutor','Student 1','Student 2'];
-   const matcher=new RegExp('('+speakerLabels.join('|')+'):', 'g');
-   const matches=[...script.matchAll(matcher)];
-   const turns=matches.length?matches.map((match,index)=>({
-    speaker:match[1],
-    text:script.slice(match.index+match[0].length,index+1<matches.length?matches[index+1].index:script.length).trim()
-   })).filter(turn=>turn.text):[{speaker:'Narrator',text:script}];
-   const available=window.speechSynthesis.getVoices().filter(v=>/^en-GB/i.test(v.lang));
-   const distinct=available.filter((voice,index)=>available.findIndex(v=>v.voiceURI===voice.voiceURI)===index);
-   setPlaying(true);
-   for(let index=0;index<turns.length;index++){
-    if(token!==playbackToken.current)break;
-    const turn=turns[index];
-    await new Promise(resolve=>{
-     const utterance=new SpeechSynthesisUtterance(turn.text);
-     if(distinct.length)utterance.voice=distinct[index%distinct.length];
-     utterance.lang='en-GB';
-     utterance.rate=turn.speaker==='Narrator'?0.94:(index%2?0.97:0.93);
-     utterance.pitch=turn.speaker==='Narrator'?1:(index%2?1.08:0.92);
-     utterance.onend=resolve;
-     utterance.onerror=resolve;
-     window.speechSynthesis.speak(utterance);
-    });
-   }
-   if(token===playbackToken.current){setPlaying(false);setPlayed(p=>({...p,[activePart]:true}));}
+   setPlaying(false);
+   if(audioRef.current){audioRef.current.pause();audioRef.current=null;}
+   alert('The natural multi-speaker recording could not be generated or played. Please try again shortly. IELTS Guru will not replace it with a robotic browser voice.');
   }finally{setAudioLoading(false);}
  };
  const stop=()=>{playbackToken.current++;if(window.speechSynthesis)window.speechSynthesis.cancel();if(audioRef.current){audioRef.current.pause();audioRef.current.currentTime=0;audioRef.current=null;}setPlaying(false);};
