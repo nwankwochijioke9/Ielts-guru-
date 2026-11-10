@@ -287,12 +287,12 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
     // Split long turns at sentence boundaries while preserving each speaker's
     // voice and accent; use word boundaries only for an unusually long sentence.
     const splitSpeechInput = (input, maxLength = 3500) => {
-      const sentences = input.match(/[^.!?]+(?:[.!?]+[\"')\\]]*|$)/g) || [input];
+      const sentences = input.match(/[^.!?]+(?:[.!?]+["')\]]*|$)/g) || [input];
       const chunks = [];
       let current = '';
       const splitLongSentence = sentence => {
         let piece = '';
-        for (const word of sentence.split(/\\s+/)) {
+        for (const word of sentence.split(/\s+/)) {
           if (piece && piece.length + 1 + word.length > maxLength) {
             chunks.push(piece);
             piece = word;
