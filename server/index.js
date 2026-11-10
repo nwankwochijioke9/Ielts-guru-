@@ -50,7 +50,7 @@ async function sendVerificationEmail(email,token) {
 }
 app.post('/api/auth/register', async (req,res) => {
  const email=String(req.body?.email||'').trim().toLowerCase(); const password=String(req.body?.password||'');
- if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length>254) return res.status(400).json({error:'Enter a valid email address.'});
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length>254) return res.status(400).json({error:'Enter a valid email address.'});
  if(password.length<10 || password.length>128) return res.status(400).json({error:'Use a password between 10 and 128 characters.'});
  if(!pool) return res.status(503).json({error:'Registration is temporarily unavailable because the database is not connected. Please try again later.'});
  let learner;
