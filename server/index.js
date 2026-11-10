@@ -284,6 +284,7 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
           model: 'gpt-4o-mini-tts',
           voice: segment.voice,
           input: segment.input,
+          speed: 0.92,
           instructions: 'You are one participant in a realistic IELTS Listening recording. Speak in natural ' + segment.accent + ' with a distinct, consistent personal voice, realistic intonation and measured exam-style pacing. This is a real conversation, not a single narrator reading a script. Keep your own speaking style distinct from the other speakers. Pronounce names, dates, addresses and numbers clearly. Speak only the supplied words; do not add commentary.'
         });
         const audio = Buffer.from(await speech.arrayBuffer());
