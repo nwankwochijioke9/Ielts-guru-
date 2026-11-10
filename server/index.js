@@ -31,7 +31,13 @@ async function getTrial(userId) { await pool.query('INSERT INTO free_trials(tria
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: '18mb' }));
-app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, limit: 100 }));
+app.use('/api', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  // Render polls this endpoint for service health; it must not consume or hit
+  // the learner-facing API rate limit, even when checks are frequent.
+  skip: (req) => req.path === '/health'
+}));
 
 async function initDb() {
   if (!pool) return;
