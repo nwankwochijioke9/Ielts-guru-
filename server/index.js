@@ -240,24 +240,32 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
   if (typeof script !== 'string' || !script.trim() || script.length > 10000) return res.status(400).json({ error: 'A valid listening script is required.' });
   if (!openai) return res.status(503).json({ error: 'Natural AI audio is not configured. Add OPENAI_API_KEY in Render environment settings.' });
   try {
-    const voiceBySpeaker = {
-      'Receptionist': 'coral', 'Caller': 'alloy',
-      'Tutor': 'echo', 'Student 1': 'nova', 'Student 2': 'shimmer'
-    };
-    const labels = ['Receptionist', 'Caller', 'Tutor', 'Student 1', 'Student 2'];
-    const matcher = new RegExp('(' + labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + '):', 'g');
+    // Rotate the voice cast for every recording instead of assigning the same
+    // fixed voice to a role in every test. Speakers within one recording always
+    // receive different voices; the same script keeps a stable cast on replay.
+    const voicePool = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer', 'verse', 'marin', 'cedar'];
+    let scriptHash = 2166136261;
+    for (let i = 0; i < script.length; i++) {
+      scriptHash ^= script.charCodeAt(i);
+      scriptHash = Math.imul(scriptHash, 16777619);
+    }
+    const castOffset = (scriptHash >>> 0) % voicePool.length;
+    const labels = ['Receptionist', 'Caller', 'Tutor', 'Student 1', 'Student 2', 'Guide', 'Visitor', 'Student', 'Lecturer', 'Researcher', 'Interviewer', 'Participant 1', 'Participant 2'];
+    const matcher = new RegExp('(' + labels.sort((a, b) => b.length - a.length).join('|') + '):', 'g');
     const matches = [...script.matchAll(matcher)];
     const segments = [];
     if (matches.length) {
+      const speakerVoices = new Map();
       for (let i = 0; i < matches.length; i++) {
         const label = matches[i][1];
+        if (!speakerVoices.has(label)) speakerVoices.set(label, voicePool[(castOffset + speakerVoices.size) % voicePool.length]);
         const start = matches[i].index + matches[i][0].length;
         const end = i + 1 < matches.length ? matches[i + 1].index : script.length;
         const input = script.slice(start, end).trim();
-        if (input) segments.push({ speaker: label, voice: voiceBySpeaker[label], input });
+        if (input) segments.push({ speaker: label, voice: speakerVoices.get(label), input });
       }
     } else {
-      const voice = script.includes('Welcome to Greenbank Park') ? 'coral' : 'echo';
+      const voice = voicePool[castOffset];
       segments.push({ speaker: 'Narrator', voice, input: script.trim() });
     }
     if (!segments.length || segments.length > 40) return res.status(400).json({ error: 'The listening script could not be divided into valid speaker turns.' });
