@@ -244,6 +244,7 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
     // fixed voice to a role in every test. Speakers within one recording always
     // receive different voices; the same script keeps a stable cast on replay.
     const voicePool = ['alloy', 'coral', 'echo', 'nova', 'shimmer'];
+    const accentPool = ['British English', 'Australian English', 'New Zealand English', 'North American English', 'Irish English'];
     let scriptHash = 2166136261;
     for (let i = 0; i < script.length; i++) {
       scriptHash ^= script.charCodeAt(i);
@@ -256,17 +257,22 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
     const segments = [];
     if (matches.length) {
       const speakerVoices = new Map();
+      const speakerAccents = new Map();
       for (let i = 0; i < matches.length; i++) {
         const label = matches[i][1];
-        if (!speakerVoices.has(label)) speakerVoices.set(label, voicePool[(castOffset + speakerVoices.size) % voicePool.length]);
+        if (!speakerVoices.has(label)) {
+          const speakerIndex = speakerVoices.size;
+          speakerVoices.set(label, voicePool[(castOffset + speakerIndex) % voicePool.length]);
+          speakerAccents.set(label, accentPool[(castOffset + speakerIndex) % accentPool.length]);
+        }
         const start = matches[i].index + matches[i][0].length;
         const end = i + 1 < matches.length ? matches[i + 1].index : script.length;
         const input = script.slice(start, end).trim();
-        if (input) segments.push({ speaker: label, voice: speakerVoices.get(label), input });
+        if (input) segments.push({ speaker: label, voice: speakerVoices.get(label), accent: speakerAccents.get(label), input });
       }
     } else {
       const voice = voicePool[castOffset];
-      segments.push({ speaker: 'Narrator', voice, input: script.trim() });
+      segments.push({ speaker: 'Narrator', voice, accent: accentPool[castOffset], input: script.trim() });
     }
     if (!segments.length || segments.length > 40) return res.status(400).json({ error: 'The listening script could not be divided into valid speaker turns.' });
     const audioSegments = [];
@@ -275,7 +281,7 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
         model: 'gpt-4o-mini-tts',
         voice: segment.voice,
         input: segment.input,
-        instructions: 'You are one participant in a realistic IELTS Listening recording. Speak in natural British English with a distinct, consistent personal voice, realistic intonation and conversational pacing. This is a real conversation, not a single narrator reading a script. Keep your own speaking style distinct from the other speakers. Pronounce names, dates, addresses and numbers clearly. Speak only the supplied words; do not add commentary.'
+        instructions: 'You are one participant in a realistic IELTS Listening recording. Speak in natural ' + segment.accent + ' with a distinct, consistent personal voice, realistic intonation and conversational pacing. This is a real conversation, not a single narrator reading a script. Keep your own speaking style distinct from the other speakers. Pronounce names, dates, addresses and numbers clearly. Speak only the supplied words; do not add commentary.'
       });
       const audio = Buffer.from(await speech.arrayBuffer());
       audioSegments.push({ speaker: segment.speaker, audio: audio.toString('base64') });
