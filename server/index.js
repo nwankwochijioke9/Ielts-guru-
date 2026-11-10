@@ -11,6 +11,8 @@ import { promisify } from 'node:util';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+// Render terminates TLS and forwards requests through one trusted proxy.
+app.set('trust proxy', 1);
 const port = process.env.PORT || 10000;
 const pool = process.env.DATABASE_URL ? new pg.Pool({
   connectionString: process.env.DATABASE_URL,
