@@ -283,11 +283,49 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
       segments.push({ speaker: 'Narrator', voice, accent: accentPool[castOffset], input: script.trim() });
     }
     if (!segments.length || segments.length > 80) return res.status(400).json({ error: 'The listening script could not be divided into valid speaker turns.' });
+    // The Speech API accepts at most 4,096 input characters per request.
+    // Split long turns at sentence boundaries while preserving each speaker's
+    // voice and accent; use word boundaries only for an unusually long sentence.
+    const splitSpeechInput = (input, maxLength = 3500) => {
+      const sentences = input.match(/[^.!?]+(?:[.!?]+["')\]]*(?=\s|$)|$)/g) || [input];
+      const chunks = [];
+      let current = '';
+      const splitLongSentence = sentence => {
+        let piece = '';
+        for (const word of sentence.split(/\s+/)) {
+          if (piece && piece.length + 1 + word.length > maxLength) {
+            chunks.push(piece);
+            piece = word;
+          } else {
+            piece = piece ? piece + ' ' + word : word;
+          }
+        }
+        if (piece) chunks.push(piece);
+      };
+      for (const sentence of sentences) {
+        const clean = sentence.trim();
+        if (!clean) continue;
+        if (clean.length > maxLength) {
+          if (current) chunks.push(current);
+          current = '';
+          splitLongSentence(clean);
+        } else if (current && current.length + 1 + clean.length > maxLength) {
+          chunks.push(current);
+          current = clean;
+        } else {
+          current = current ? current + ' ' + clean : clean;
+        }
+      }
+      if (current) chunks.push(current);
+      return chunks;
+    };
+    const speechSegments = segments.flatMap(segment => splitSpeechInput(segment.input).map(input => ({ ...segment, input })));
+    if (!speechSegments.length || speechSegments.length > 120) return res.status(400).json({ error: 'The listening script contains too many audio segments.' });
     const audioSegments = [];
     // Generate a small batch concurrently to keep full-length recordings within
     // normal web-request limits while retaining the original speaker order.
-    for (let offset = 0; offset < segments.length; offset += 4) {
-      const batch = await Promise.all(segments.slice(offset, offset + 4).map(async (segment) => {
+    for (let offset = 0; offset < speechSegments.length; offset += 4) {
+      const batch = await Promise.all(speechSegments.slice(offset, offset + 4).map(async (segment) => {
         const speech = await openai.audio.speech.create({
           model: 'gpt-4o-mini-tts',
           voice: segment.voice,
