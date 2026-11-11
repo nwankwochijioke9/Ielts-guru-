@@ -241,7 +241,13 @@ app.post('/api/speaking-examiner-audio', requireLearner, async (req, res) => {
     res.send(audio);
   } catch (error) {
     console.error('Speaking examiner audio failed:', error?.message || error);
-    res.status(502).json({ error: 'Unable to generate examiner audio right now.' });
+    const quotaExhausted = error?.status === 429 || error?.code === 'insufficient_quota' || /no credits remaining|insufficient_quota/i.test(error?.message || '');
+    res.status(quotaExhausted ? 503 : 502).json({
+      error: quotaExhausted
+        ? 'Natural IELTS Speaking examiner audio is temporarily unavailable because the OpenAI API account has no credits remaining. Please try again after the API billing balance is topped up.'
+        : 'Unable to generate examiner audio right now.',
+      code: quotaExhausted ? 'AI_CREDITS_EXHAUSTED' : 'AUDIO_GENERATION_FAILED'
+    });
   }
 });
 
@@ -360,7 +366,13 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
     res.json({ segments: audioSegments, cached: false });
   } catch (error) {
     console.error('Listening audio generation failed:', error?.message || error);
-    res.status(502).json({ error: 'Unable to generate multi-speaker listening audio right now.' });
+    const quotaExhausted = error?.status === 429 || error?.code === 'insufficient_quota' || /no credits remaining|insufficient_quota/i.test(error?.message || '');
+    res.status(quotaExhausted ? 503 : 502).json({
+      error: quotaExhausted
+        ? 'Natural IELTS Listening audio is temporarily unavailable because the OpenAI API account has no credits remaining. Please try again after the API billing balance is topped up.'
+        : 'Unable to generate multi-speaker listening audio right now.',
+      code: quotaExhausted ? 'AI_CREDITS_EXHAUSTED' : 'AUDIO_GENERATION_FAILED'
+    });
   }
 });
 const dist = path.resolve(__dirname, '../dist');
