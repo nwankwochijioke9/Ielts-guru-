@@ -19,6 +19,10 @@ const pool = process.env.DATABASE_URL ? new pg.Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 }) : null;
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+// Reuse generated audio for repeat practice attempts and avoid duplicate TTS charges.
+const listeningAudioCache = new Map();
+const LISTENING_AUDIO_CACHE_LIMIT = 3;
+const LISTENING_AUDIO_CACHE_TTL_MS = 30 * 60 * 1000;
 const scrypt = promisify(scryptCallback);
 const SESSION_DAYS = 30;
 const cookieName = 'ielts_guru_session';
@@ -247,6 +251,15 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
   const { script } = req.body || {};
   if (typeof script !== 'string' || !script.trim() || script.length > 10000) return res.status(400).json({ error: 'A valid listening script is required.' });
   if (!openai) return res.status(503).json({ error: 'Natural AI audio is not configured. Add OPENAI_API_KEY in Render environment settings.' });
+  const cacheKey = createHash('sha256').update('listening-audio-v2:').update(script).digest('hex');
+  const cachedAudio = listeningAudioCache.get(cacheKey);
+  if (cachedAudio && cachedAudio.expiresAt > Date.now()) {
+    listeningAudioCache.delete(cacheKey);
+    listeningAudioCache.set(cacheKey, cachedAudio);
+    res.set({ 'Cache-Control': 'private, no-store' });
+    return res.json({ segments: cachedAudio.segments, cached: true });
+  }
+  if (cachedAudio) listeningAudioCache.delete(cacheKey);
   try {
     // Rotate the voice cast for every recording instead of assigning the same
     // fixed voice to a role in every test. Speakers within one recording always
@@ -338,8 +351,13 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
       }));
       audioSegments.push(...batch);
     }
+    listeningAudioCache.set(cacheKey, { segments: audioSegments, expiresAt: Date.now() + LISTENING_AUDIO_CACHE_TTL_MS });
+    while (listeningAudioCache.size > LISTENING_AUDIO_CACHE_LIMIT) {
+      const oldestKey = listeningAudioCache.keys().next().value;
+      listeningAudioCache.delete(oldestKey);
+    }
     res.set({ 'Cache-Control': 'private, no-store' });
-    res.json({ segments: audioSegments });
+    res.json({ segments: audioSegments, cached: false });
   } catch (error) {
     console.error('Listening audio generation failed:', error?.message || error);
     res.status(502).json({ error: 'Unable to generate multi-speaker listening audio right now.' });
