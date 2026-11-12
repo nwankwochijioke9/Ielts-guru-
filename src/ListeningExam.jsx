@@ -142,7 +142,7 @@ export default function ListeningExam({testType='academic',testMode='practice',o
   if(result)return;
   setResult({score,answered,band,review});
   const completed={score,answered,total:40,band};
-  fetch('/api/practice-result',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({skill:'listening',score,answered,total:40,band})}).finally(()=>onComplete?.(completed));
+  fetch('/api/practice-result',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({skill:'listening',score,answered,total:40,band})}).catch(()=>{}).finally(()=>onComplete?.(completed));
  };
 return <div className="listening-exam">
   <div className="listening-top"><div><span className="tag">IELTS LISTENING · {testType==='academic'?'ACADEMIC':'GENERAL TRAINING'}</span><h3>Listening test · 40 questions</h3><p>4 parts · 40 questions · about 30 minutes of audio, followed by a short checking period. Mock recordings can be played once.</p></div><div className="listening-progress">{mock?String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0'):Object.values(answers).filter(v=>String(v||'').trim()).length}<small>{mock?' time left':' / 40 answered'}</small></div></div>
