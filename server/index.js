@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import pg from 'pg';
 import OpenAI, { toFile } from 'openai';
 import fs from 'node:fs/promises';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, createHash, timingSafeEqual, scrypt as scryptCallback } from 'node:crypto';
@@ -98,6 +99,13 @@ app.post('/api/auth/login', async (req,res) => {
  try { const result=await pool.query('SELECT id,email,password_hash,email_verified_at FROM learners WHERE email=$1',[email]); if(!result.rows[0] || !(await verifyPassword(password,result.rows[0].password_hash))) return res.status(401).json({error:'Email or password is incorrect.'}); if(!result.rows[0].email_verified_at) return res.status(403).json({error:'Please verify your email first. Use the resend verification option if needed.',code:'EMAIL_NOT_VERIFIED'}); res.json(await issueSession({id:result.rows[0].id,email:result.rows[0].email},res)); } catch(error) { console.error('Login failed:',error?.message||error); res.status(500).json({error:'Unable to sign in. Please try again.'}); }
 });app.get('/api/auth/me', requireLearner, async (req,res) => { const trial=await getTrial(req.learner.id); const subscription=await getActiveSubscription(req.learner.id); res.json({user:req.learner,trial:{active:trial.active,days_left:trial.days_left,expires_at:trial.expires_at,ai_reviews_used:trial.ai_reviews_used},subscription}); });
 app.post('/api/auth/logout', async (req,res) => { const token=readCookie(req,cookieName); if(token && pool) await pool.query('DELETE FROM learner_sessions WHERE token_hash=$1',[hashToken(token)]).catch(()=>{}); res.clearCookie(cookieName,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/'}); res.json({ok:true}); });
+app.get('/api/progress', requireLearner, async (req,res) => {
+  try {
+    const { rows } = await pool.query('SELECT id,skill,estimated_band,feedback,created_at FROM practice_attempts WHERE user_id=$1 ORDER BY created_at DESC LIMIT 20',[req.learner.id]);
+    res.json({ attempts: rows });
+  } catch (error) { console.error('Progress history failed:',error?.message||error); res.status(500).json({ error: 'Unable to load your practice history.' }); }
+});
+
 app.get('/api/trial/status', requireLearner, async (req,res) => { const trial=await getTrial(req.learner.id); const subscription=await getActiveSubscription(req.learner.id); res.json({active:trial.active,days_left:trial.days_left,expires_at:trial.expires_at,ai_reviews_used:trial.ai_reviews_used,ai_reviews_remaining:Math.max(0,1-trial.ai_reviews_used),subscription}); });
 async function verifyFlutterwaveTransaction(transactionId,expectedRef) {
  if(!process.env.FLW_SECRET_KEY) throw new Error('Flutterwave is not configured.');
@@ -108,7 +116,7 @@ async function activatePaidPlan(payment) {
  const client=await pool.connect();
  try { await client.query('BEGIN'); const locked=await client.query('SELECT id,user_id,plan_id,amount,currency,status FROM payment_transactions WHERE tx_ref=$1 FOR UPDATE',[payment.tx_ref]); const pending=locked.rows[0];
   if(!pending || pending.status==='successful') { await client.query('COMMIT'); return false; }
-  if(pending.status!=='pending' || Number(payment.amount)<Number(pending.amount) || payment.currency!==pending.currency) throw new Error('Payment amount or currency does not match the selected plan.');
+  if(pending.status!=='pending' || Number(payment.amount)!==Number(pending.amount) || payment.currency!==pending.currency) throw new Error('Payment amount or currency does not match the selected plan.');
   const plan=await client.query('SELECT duration_days FROM plans WHERE id=$1 AND active=true',[pending.plan_id]); if(!plan.rows[0]) throw new Error('The selected plan is no longer available.');
   await client.query("UPDATE payment_transactions SET status='successful',provider_transaction_id=$1,paid_at=NOW() WHERE id=$2",[String(payment.id),pending.id]);
   await client.query("UPDATE subscriptions SET status='expired' WHERE user_id=$1 AND status='active'",[pending.user_id]);
@@ -162,6 +170,18 @@ app.put('/api/admin/plans/:id', async (req, res) => {
     res.json(rows[0]);
   } catch { res.status(500).json({ error: 'Unable to update plan.' }); }
 });
+app.post('/api/practice-result', requireLearner, async (req,res) => {
+  const { skill, score, answered, total, band } = req.body || {};
+  if (!['reading','listening'].includes(skill) || !Number.isInteger(score) || score < 0 || score > 40 || !Number.isInteger(answered) || answered < 0 || answered > 40 || total !== 40 || (band !== null && band !== undefined && (!Number.isFinite(Number(band)) || Number(band) < 0 || Number(band) > 9))) return res.status(400).json({ error: 'Invalid practice result.' });
+  const trial = await getTrial(req.learner.id);
+  if (!trial.active && !(await getActiveSubscription(req.learner.id))) return res.status(403).json({ error: 'Your 3-day trial has ended. Subscribe to continue saving practice results.' });
+  const feedback = { score, answered, total, band: band == null ? null : Number(band), summary: skill[0].toUpperCase()+skill.slice(1)+' practice: '+score+'/40 correct; '+answered+' answered.' };
+  try {
+    await pool.query('INSERT INTO practice_attempts(user_id,skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5,$6)',[req.learner.id,skill,skill+' practice test',score+'/40 correct; '+answered+' answered',band == null ? null : Number(band),JSON.stringify(feedback)]);
+    res.json({ saved: true });
+  } catch (error) { console.error('Practice result save failed:',error?.message||error); res.status(500).json({ error: 'Unable to save this practice result.' }); }
+});
+
 app.post('/api/assess', requireLearner, async (req, res) => {
   const { skill, prompt, response } = req.body || {};
   if (!['writing','speaking','reading','listening'].includes(skill) || typeof prompt !== 'string' || typeof response !== 'string' || !response.trim() || response.length > 12000) return res.status(400).json({ error: 'Please provide a valid skill, task and answer (maximum 12,000 characters).' });
@@ -182,7 +202,7 @@ app.post('/api/assess', requireLearner, async (req, res) => {
       ]
     });
     const feedback = JSON.parse(completion.choices[0].message.content || '{}');
-    await pool.query('INSERT INTO practice_attempts(skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5)', [skill,prompt,response,feedback.estimated_band ?? null,JSON.stringify(feedback)]);
+    await pool.query('INSERT INTO practice_attempts(user_id,skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5,$6)', [req.learner.id,skill,prompt,response,feedback.estimated_band ?? null,JSON.stringify(feedback)]);
     res.json({ ...feedback, disclaimer: 'AI-generated practice estimate only; not an official IELTS score.' });
   } catch { if (!subscription) await pool.query('UPDATE free_trials SET ai_reviews_used=GREATEST(0,ai_reviews_used-1) WHERE user_id=$1',[req.learner.id]).catch(()=>{}); res.status(500).json({ error: 'Assessment failed. Please try again.' }); }
 });
@@ -213,6 +233,7 @@ app.post('/api/assess-speaking', requireLearner, async (req, res) => {
       ]
     });
     const feedback = JSON.parse(completion.choices[0].message.content || '{}');
+    await pool.query('INSERT INTO practice_attempts(user_id,skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5,$6)',[req.learner.id,'speaking','IELTS '+testType+' Speaking interview',transcript,null,JSON.stringify(feedback)]);
     res.json({ ...feedback, transcript, estimated_band: null, disclaimer: 'AI-generated transcript-based practice feedback only. Pronunciation and an overall IELTS Speaking band cannot be reliably assessed from this transcript. This is not an official IELTS score.' });
   } catch (error) {
     console.error('Speaking assessment failed:', error?.message || error);
@@ -267,6 +288,16 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
   }
   if (cachedAudio) listeningAudioCache.delete(cacheKey);
   try {
+    // Persist generated recordings in PostgreSQL so a Render restart or a new
+    // learner session does not trigger another paid text-to-speech generation.
+    const persistedAudio = await pool.query('SELECT audio_data FROM listening_audio_cache WHERE cache_key=$1', [cacheKey]);
+    if (persistedAudio.rows[0]) {
+      const savedSegments = JSON.parse(gunzipSync(persistedAudio.rows[0].audio_data).toString('utf8'));
+      listeningAudioCache.set(cacheKey, { segments: savedSegments, expiresAt: Date.now() + LISTENING_AUDIO_CACHE_TTL_MS });
+      res.set({ 'Cache-Control': 'private, no-store', 'X-IELTS-Audio-Cache': 'HIT' });
+      return res.json({ segments: savedSegments, cached: true });
+    }
+
     // Rotate the voice cast for every recording instead of assigning the same
     // fixed voice to a role in every test. Speakers within one recording always
     // receive different voices; the same script keeps a stable cast on replay.
@@ -357,12 +388,17 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
       }));
       audioSegments.push(...batch);
     }
+    const compressedAudio = gzipSync(Buffer.from(JSON.stringify(audioSegments)));
+    await pool.query(
+      'INSERT INTO listening_audio_cache(cache_key, audio_data, segment_count) VALUES($1,$2,$3) ON CONFLICT(cache_key) DO NOTHING',
+      [cacheKey, compressedAudio, audioSegments.length]
+    );
     listeningAudioCache.set(cacheKey, { segments: audioSegments, expiresAt: Date.now() + LISTENING_AUDIO_CACHE_TTL_MS });
     while (listeningAudioCache.size > LISTENING_AUDIO_CACHE_LIMIT) {
       const oldestKey = listeningAudioCache.keys().next().value;
       listeningAudioCache.delete(oldestKey);
     }
-    res.set({ 'Cache-Control': 'private, no-store' });
+    res.set({ 'Cache-Control': 'private, no-store', 'X-IELTS-Audio-Cache': 'MISS' });
     res.json({ segments: audioSegments, cached: false });
   } catch (error) {
     console.error('Listening audio generation failed:', error?.message || error);
