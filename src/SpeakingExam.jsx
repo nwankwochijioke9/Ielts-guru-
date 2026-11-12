@@ -149,27 +149,21 @@ and explain why you remember this journey.`, part3: ['How has transport changed 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: spokenText, voice: examinerVoice })
       });
-      if (!response.ok) throw new Error('Examiner audio is not available.');
+      if (!response.ok) {
+        let detail = '';
+        try { detail = (await response.json()).error || ''; } catch {}
+        throw new Error(detail || 'Natural examiner audio is temporarily unavailable. Please try again.');
+      }
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
       const player = new Audio(audioUrl);
       examinerAudioRef.current = player;
       player.onended = () => { URL.revokeObjectURL(audioUrl); setAudioStatus('Examiner prompt played'); };
-      player.onerror = () => { URL.revokeObjectURL(audioUrl); setAudioStatus(''); };
+      player.onerror = () => { URL.revokeObjectURL(audioUrl); setAudioStatus('Natural examiner audio could not be played. Please try again.'); };
       await player.play();
       setAudioStatus('Examiner is speaking…');
-    } catch {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(spokenText);
-        utterance.lang = 'en-GB';
-        utterance.rate = 0.94;
-        const voices = window.speechSynthesis.getVoices();
-        const preferred = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
-        if (preferred) utterance.voice = preferred;
-        utterance.onend = () => setAudioStatus('Browser voice used');
-        window.speechSynthesis.speak(utterance);
-      } else setAudioStatus('Audio is unavailable on this device.');
+    } catch (error) {
+      setAudioStatus(error?.message || 'Natural examiner audio is unavailable. Please try again.');
     }
   }
 
