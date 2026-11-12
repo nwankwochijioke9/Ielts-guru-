@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import pg from 'pg';
 import OpenAI, { toFile } from 'openai';
 import fs from 'node:fs/promises';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, createHash, timingSafeEqual, scrypt as scryptCallback } from 'node:crypto';
@@ -245,10 +246,22 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
   const { script } = req.body || {};
   if (typeof script !== 'string' || !script.trim() || script.length > 10000) return res.status(400).json({ error: 'A valid listening script is required.' });
   if (!openai) return res.status(503).json({ error: 'Natural AI audio is not configured. Add OPENAI_API_KEY in Render environment settings.' });
+  if (!pool) return res.status(503).json({ error: 'Saved Listening audio requires the IELTS Guru database to be configured.' });
+
+  // Version this key whenever the TTS model, voice assignment, speed or prompt changes.
+  // The generated MP3 segments are compressed and stored centrally in PostgreSQL,
+  // so every learner reuses the same recording instead of paying for regeneration.
+  const cacheKey = createHash('sha256').update('listening-audio-v1\\n').update(script).digest('hex');
   try {
-    // Rotate the voice cast for every recording instead of assigning the same
-    // fixed voice to a role in every test. Speakers within one recording always
-    // receive different voices; the same script keeps a stable cast on replay.
+    const cached = await pool.query('SELECT audio_data FROM listening_audio_cache WHERE cache_key=$1', [cacheKey]);
+    if (cached.rows[0]) {
+      const savedSegments = JSON.parse(gunzipSync(cached.rows[0].audio_data).toString('utf8'));
+      res.set({ 'Cache-Control': 'private, no-store', 'X-IELTS-Audio-Cache': 'HIT' });
+      return res.json({ segments: savedSegments, cached: true });
+    }
+
+    // Rotate the voice cast deterministically per script. A saved script always
+    // reuses exactly the same voices on every subsequent playback.
     const voicePool = ['coral', 'onyx', 'nova', 'echo', 'shimmer', 'ash', 'ballad', 'fable', 'sage', 'verse', 'marin', 'cedar', 'alloy'];
     const accentPool = ['British English', 'Australian English', 'New Zealand English', 'North American English', 'Irish English'];
     let scriptHash = 2166136261;
@@ -271,9 +284,9 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
           speakerVoices.set(label, voicePool[(castOffset + speakerIndex) % voicePool.length]);
           speakerAccents.set(label, accentPool[(castOffset + speakerIndex) % accentPool.length]);
         }
-        const start = matches[i].index + matches[i][0].length;
-        const end = i + 1 < matches.length ? matches[i + 1].index : script.length;
-        const input = script.slice(start, end).trim();
+        const segmentStart = matches[i].index + matches[i][0].length;
+        const segmentEnd = i + 1 < matches.length ? matches[i + 1].index : script.length;
+        const input = script.slice(segmentStart, segmentEnd).trim();
         if (input) segments.push({ speaker: label, voice: speakerVoices.get(label), accent: speakerAccents.get(label), input });
       }
     } else {
@@ -281,9 +294,8 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
       segments.push({ speaker: 'Narrator', voice, accent: accentPool[castOffset], input: script.trim() });
     }
     if (!segments.length || segments.length > 80) return res.status(400).json({ error: 'The listening script could not be divided into valid speaker turns.' });
+
     const audioSegments = [];
-    // Generate a small batch concurrently to keep full-length recordings within
-    // normal web-request limits while retaining the original speaker order.
     for (let offset = 0; offset < segments.length; offset += 4) {
       const batch = await Promise.all(segments.slice(offset, offset + 4).map(async (segment) => {
         const speech = await openai.audio.speech.create({
@@ -298,11 +310,17 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
       }));
       audioSegments.push(...batch);
     }
-    res.set({ 'Cache-Control': 'private, no-store' });
-    res.json({ segments: audioSegments });
+
+    const compressedAudio = gzipSync(Buffer.from(JSON.stringify(audioSegments)));
+    await pool.query(
+      'INSERT INTO listening_audio_cache(cache_key, audio_data, segment_count) VALUES($1,$2,$3) ON CONFLICT(cache_key) DO NOTHING',
+      [cacheKey, compressedAudio, audioSegments.length]
+    );
+    res.set({ 'Cache-Control': 'private, no-store', 'X-IELTS-Audio-Cache': 'MISS' });
+    return res.json({ segments: audioSegments, cached: false });
   } catch (error) {
-    console.error('Listening audio generation failed:', error?.message || error);
-    res.status(502).json({ error: 'Unable to generate multi-speaker listening audio right now.' });
+    console.error('Listening audio generation or cache failed:', error?.message || error);
+    res.status(502).json({ error: 'Unable to generate or save Listening audio right now. Please try again shortly.' });
   }
 });
 const dist = path.resolve(__dirname, '../dist');
