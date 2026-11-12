@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS learners (
 );
 ALTER TABLE free_trials ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES learners(id);
 CREATE UNIQUE INDEX IF NOT EXISTS free_trials_user_id_unique ON free_trials(user_id) WHERE user_id IS NOT NULL;
+ALTER TABLE practice_attempts ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES learners(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS practice_attempts_user_created_idx ON practice_attempts(user_id,created_at DESC);
+
 CREATE TABLE IF NOT EXISTS learner_sessions (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
