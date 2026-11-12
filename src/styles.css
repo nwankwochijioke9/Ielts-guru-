@@ -223,3 +223,4 @@
 .writing-task-points p{margin:0 0 7px}
 .writing-task-points ul{margin:0 0 8px;padding-left:20px}
 .writing-task-points li{margin:4px 0}
+.progress-history{padding-top:18px}.progress-empty{padding:20px;border:1px dashed #d8e1d9;border-radius:10px;color:#71817b;font-size:13px}.progress-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.progress-card{padding:17px;border:1px solid #e4e9e4;border-radius:10px;background:#fff}.progress-card-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.progress-card-top span{font-size:10px;font-weight:800;letter-spacing:.08em;color:#73827b}.progress-card-top strong{font:700 14px Manrope;color:#1d4140}.progress-card p{margin:12px 0;color:#53645f;font-size:12px;line-height:1.6}.progress-card small{color:#84918b;font-size:10px}
