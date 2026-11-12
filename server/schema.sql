@@ -73,3 +73,10 @@ CREATE INDEX IF NOT EXISTS learners_verification_token_idx ON learners(email_ver
 CREATE TABLE IF NOT EXISTS payment_transactions (id BIGSERIAL PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,plan_id INTEGER NOT NULL REFERENCES plans(id),tx_ref TEXT NOT NULL UNIQUE,amount NUMERIC(12,2) NOT NULL,currency TEXT NOT NULL DEFAULT 'NGN',status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','successful','failed')),provider_transaction_id TEXT,paid_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS subscriptions (id BIGSERIAL PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,plan_id INTEGER NOT NULL REFERENCES plans(id),payment_ref TEXT NOT NULL UNIQUE,starts_at TIMESTAMPTZ NOT NULL,ends_at TIMESTAMPTZ NOT NULL,status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','expired','cancelled')),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE INDEX IF NOT EXISTS subscriptions_user_status_idx ON subscriptions(user_id,status,ends_at);
+
+CREATE TABLE IF NOT EXISTS listening_audio_cache (
+  cache_key TEXT PRIMARY KEY,
+  audio_data BYTEA NOT NULL,
+  segment_count INTEGER NOT NULL CHECK (segment_count > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
