@@ -99,6 +99,13 @@ app.post('/api/auth/login', async (req,res) => {
  try { const result=await pool.query('SELECT id,email,password_hash,email_verified_at FROM learners WHERE email=$1',[email]); if(!result.rows[0] || !(await verifyPassword(password,result.rows[0].password_hash))) return res.status(401).json({error:'Email or password is incorrect.'}); if(!result.rows[0].email_verified_at) return res.status(403).json({error:'Please verify your email first. Use the resend verification option if needed.',code:'EMAIL_NOT_VERIFIED'}); res.json(await issueSession({id:result.rows[0].id,email:result.rows[0].email},res)); } catch(error) { console.error('Login failed:',error?.message||error); res.status(500).json({error:'Unable to sign in. Please try again.'}); }
 });app.get('/api/auth/me', requireLearner, async (req,res) => { const trial=await getTrial(req.learner.id); const subscription=await getActiveSubscription(req.learner.id); res.json({user:req.learner,trial:{active:trial.active,days_left:trial.days_left,expires_at:trial.expires_at,ai_reviews_used:trial.ai_reviews_used},subscription}); });
 app.post('/api/auth/logout', async (req,res) => { const token=readCookie(req,cookieName); if(token && pool) await pool.query('DELETE FROM learner_sessions WHERE token_hash=$1',[hashToken(token)]).catch(()=>{}); res.clearCookie(cookieName,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/'}); res.json({ok:true}); });
+app.get('/api/progress', requireLearner, async (req,res) => {
+  try {
+    const { rows } = await pool.query('SELECT id,skill,estimated_band,feedback,created_at FROM practice_attempts WHERE user_id=$1 ORDER BY created_at DESC LIMIT 20',[req.learner.id]);
+    res.json({ attempts: rows });
+  } catch (error) { console.error('Progress history failed:',error?.message||error); res.status(500).json({ error: 'Unable to load your practice history.' }); }
+});
+
 app.get('/api/trial/status', requireLearner, async (req,res) => { const trial=await getTrial(req.learner.id); const subscription=await getActiveSubscription(req.learner.id); res.json({active:trial.active,days_left:trial.days_left,expires_at:trial.expires_at,ai_reviews_used:trial.ai_reviews_used,ai_reviews_remaining:Math.max(0,1-trial.ai_reviews_used),subscription}); });
 async function verifyFlutterwaveTransaction(transactionId,expectedRef) {
  if(!process.env.FLW_SECRET_KEY) throw new Error('Flutterwave is not configured.');
@@ -163,6 +170,16 @@ app.put('/api/admin/plans/:id', async (req, res) => {
     res.json(rows[0]);
   } catch { res.status(500).json({ error: 'Unable to update plan.' }); }
 });
+app.post('/api/practice-result', requireLearner, async (req,res) => {
+  const { skill, score, answered, total, band } = req.body || {};
+  if (!['reading','listening'].includes(skill) || !Number.isInteger(score) || score < 0 || score > 40 || !Number.isInteger(answered) || answered < 0 || answered > 40 || total !== 40 || (band !== null && band !== undefined && (!Number.isFinite(Number(band)) || Number(band) < 0 || Number(band) > 9))) return res.status(400).json({ error: 'Invalid practice result.' });
+  const feedback = { score, answered, total, band: band == null ? null : Number(band), summary: skill[0].toUpperCase()+skill.slice(1)+' practice: '+score+'/40 correct; '+answered+' answered.' };
+  try {
+    await pool.query('INSERT INTO practice_attempts(user_id,skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5,$6)',[req.learner.id,skill,skill+' practice test',score+'/40 correct; '+answered+' answered',band == null ? null : Number(band),JSON.stringify(feedback)]);
+    res.json({ saved: true });
+  } catch (error) { console.error('Practice result save failed:',error?.message||error); res.status(500).json({ error: 'Unable to save this practice result.' }); }
+});
+
 app.post('/api/assess', requireLearner, async (req, res) => {
   const { skill, prompt, response } = req.body || {};
   if (!['writing','speaking','reading','listening'].includes(skill) || typeof prompt !== 'string' || typeof response !== 'string' || !response.trim() || response.length > 12000) return res.status(400).json({ error: 'Please provide a valid skill, task and answer (maximum 12,000 characters).' });
@@ -183,7 +200,7 @@ app.post('/api/assess', requireLearner, async (req, res) => {
       ]
     });
     const feedback = JSON.parse(completion.choices[0].message.content || '{}');
-    await pool.query('INSERT INTO practice_attempts(skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5)', [skill,prompt,response,feedback.estimated_band ?? null,JSON.stringify(feedback)]);
+    await pool.query('INSERT INTO practice_attempts(user_id,skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5,$6)', [req.learner.id,skill,prompt,response,feedback.estimated_band ?? null,JSON.stringify(feedback)]);
     res.json({ ...feedback, disclaimer: 'AI-generated practice estimate only; not an official IELTS score.' });
   } catch { if (!subscription) await pool.query('UPDATE free_trials SET ai_reviews_used=GREATEST(0,ai_reviews_used-1) WHERE user_id=$1',[req.learner.id]).catch(()=>{}); res.status(500).json({ error: 'Assessment failed. Please try again.' }); }
 });
@@ -214,6 +231,7 @@ app.post('/api/assess-speaking', requireLearner, async (req, res) => {
       ]
     });
     const feedback = JSON.parse(completion.choices[0].message.content || '{}');
+    await pool.query('INSERT INTO practice_attempts(user_id,skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5,$6)',[req.learner.id,'speaking','IELTS '+testType+' Speaking interview',transcript,null,JSON.stringify(feedback)]);
     res.json({ ...feedback, transcript, estimated_band: null, disclaimer: 'AI-generated transcript-based practice feedback only. Pronunciation and an overall IELTS Speaking band cannot be reliably assessed from this transcript. This is not an official IELTS score.' });
   } catch (error) {
     console.error('Speaking assessment failed:', error?.message || error);
