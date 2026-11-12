@@ -116,7 +116,7 @@ async function activatePaidPlan(payment) {
  const client=await pool.connect();
  try { await client.query('BEGIN'); const locked=await client.query('SELECT id,user_id,plan_id,amount,currency,status FROM payment_transactions WHERE tx_ref=$1 FOR UPDATE',[payment.tx_ref]); const pending=locked.rows[0];
   if(!pending || pending.status==='successful') { await client.query('COMMIT'); return false; }
-  if(pending.status!=='pending' || Number(payment.amount)<Number(pending.amount) || payment.currency!==pending.currency) throw new Error('Payment amount or currency does not match the selected plan.');
+  if(pending.status!=='pending' || Number(payment.amount)!==Number(pending.amount) || payment.currency!==pending.currency) throw new Error('Payment amount or currency does not match the selected plan.');
   const plan=await client.query('SELECT duration_days FROM plans WHERE id=$1 AND active=true',[pending.plan_id]); if(!plan.rows[0]) throw new Error('The selected plan is no longer available.');
   await client.query("UPDATE payment_transactions SET status='successful',provider_transaction_id=$1,paid_at=NOW() WHERE id=$2",[String(payment.id),pending.id]);
   await client.query("UPDATE subscriptions SET status='expired' WHERE user_id=$1 AND status='active'",[pending.user_id]);
@@ -173,6 +173,8 @@ app.put('/api/admin/plans/:id', async (req, res) => {
 app.post('/api/practice-result', requireLearner, async (req,res) => {
   const { skill, score, answered, total, band } = req.body || {};
   if (!['reading','listening'].includes(skill) || !Number.isInteger(score) || score < 0 || score > 40 || !Number.isInteger(answered) || answered < 0 || answered > 40 || total !== 40 || (band !== null && band !== undefined && (!Number.isFinite(Number(band)) || Number(band) < 0 || Number(band) > 9))) return res.status(400).json({ error: 'Invalid practice result.' });
+  const trial = await getTrial(req.learner.id);
+  if (!trial.active && !(await getActiveSubscription(req.learner.id))) return res.status(403).json({ error: 'Your 3-day trial has ended. Subscribe to continue saving practice results.' });
   const feedback = { score, answered, total, band: band == null ? null : Number(band), summary: skill[0].toUpperCase()+skill.slice(1)+' practice: '+score+'/40 correct; '+answered+' answered.' };
   try {
     await pool.query('INSERT INTO practice_attempts(user_id,skill,prompt,response,estimated_band,feedback) VALUES($1,$2,$3,$4,$5,$6)',[req.learner.id,skill,skill+' practice test',score+'/40 correct; '+answered+' answered',band == null ? null : Number(band),JSON.stringify(feedback)]);
