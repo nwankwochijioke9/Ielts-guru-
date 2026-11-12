@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import pg from 'pg';
 import OpenAI, { toFile } from 'openai';
 import fs from 'node:fs/promises';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, createHash, timingSafeEqual, scrypt as scryptCallback } from 'node:crypto';
@@ -267,6 +268,16 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
   }
   if (cachedAudio) listeningAudioCache.delete(cacheKey);
   try {
+    // Persist generated recordings in PostgreSQL so a Render restart or a new
+    // learner session does not trigger another paid text-to-speech generation.
+    const persistedAudio = await pool.query('SELECT audio_data FROM listening_audio_cache WHERE cache_key=$1', [cacheKey]);
+    if (persistedAudio.rows[0]) {
+      const savedSegments = JSON.parse(gunzipSync(persistedAudio.rows[0].audio_data).toString('utf8'));
+      listeningAudioCache.set(cacheKey, { segments: savedSegments, expiresAt: Date.now() + LISTENING_AUDIO_CACHE_TTL_MS });
+      res.set({ 'Cache-Control': 'private, no-store', 'X-IELTS-Audio-Cache': 'HIT' });
+      return res.json({ segments: savedSegments, cached: true });
+    }
+
     // Rotate the voice cast for every recording instead of assigning the same
     // fixed voice to a role in every test. Speakers within one recording always
     // receive different voices; the same script keeps a stable cast on replay.
@@ -357,12 +368,17 @@ app.post('/api/listening-audio', requireLearner, async (req, res) => {
       }));
       audioSegments.push(...batch);
     }
+    const compressedAudio = gzipSync(Buffer.from(JSON.stringify(audioSegments)));
+    await pool.query(
+      'INSERT INTO listening_audio_cache(cache_key, audio_data, segment_count) VALUES($1,$2,$3) ON CONFLICT(cache_key) DO NOTHING',
+      [cacheKey, compressedAudio, audioSegments.length]
+    );
     listeningAudioCache.set(cacheKey, { segments: audioSegments, expiresAt: Date.now() + LISTENING_AUDIO_CACHE_TTL_MS });
     while (listeningAudioCache.size > LISTENING_AUDIO_CACHE_LIMIT) {
       const oldestKey = listeningAudioCache.keys().next().value;
       listeningAudioCache.delete(oldestKey);
     }
-    res.set({ 'Cache-Control': 'private, no-store' });
+    res.set({ 'Cache-Control': 'private, no-store', 'X-IELTS-Audio-Cache': 'MISS' });
     res.json({ segments: audioSegments, cached: false });
   } catch (error) {
     console.error('Listening audio generation failed:', error?.message || error);
